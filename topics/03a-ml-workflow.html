@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ML Workflow · ML, Visually</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-topic="workflow">
+<article id="lesson">
+
+<h1>The ML Pipeline &amp; Workflow</h1>
+<p class="lede">A model is only one box in a long chain. The pipeline is the organised, repeatable sequence of steps that takes you from an idea to a working system in production.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 60 min</span><span class="chip plain">7 interactive demos</span></div>
+
+<h2>1. Pipeline vs. workflow</h2>
+<p>An <strong>ML pipeline</strong> is a structured sequence of steps used to build, train and deploy a model in an organised and repeatable way. This section of the course has two parts:</p>
+<ol>
+<li><strong>ML workflow</strong>: the end-to-end process of building, deploying and maintaining an ML system, from idea to production, as a cycle you keep iterating. (This lesson.)</li>
+<li><strong>Data pre-processing</strong>: preparing raw data for a model by cleaning it, encoding categorical variables and scaling features. (Next lesson.)</li>
+</ol>
+<div class="callout analogy"><p><strong>Running a restaurant kitchen.</strong> Deciding the menu (problem statement), buying ingredients (data collection), washing and trimming them (cleaning), preparing sauces (feature engineering), tasting as you go (EDA), choosing the recipe (model selection), cooking (training), a taste test by a critic (testing), serving customers (deployment) and adjusting when tastes or suppliers change (maintenance). A great chef with rotten ingredients still serves a bad meal, and that is why most ML effort goes into the steps <em>around</em> the model.</p></div>
+
+<h2>2. The 10 steps: explore them one by one</h2>
+<p>We follow one running example through every step: <strong>a real-estate company wants to predict the selling price of a house</strong>. Click any step.</p>
+<div class="demo" data-title="The ML workflow: click a step" id="demo-steps">
+  <div class="db"><div id="stepRow" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center"></div></div>
+  <div class="db" style="padding-top:0"><div id="stepBody"></div></div>
+  <div class="controls"><button class="btn" id="stepPrev">← Previous</button><button class="btn primary" id="stepNext">Next step →</button></div>
+</div>
+<div class="callout tip"><p><strong>It is a cycle, not a line.</strong> Poor test results send you back to feature engineering or data collection; monitoring in step 10 sends you back to step 2 with fresh data. Real projects loop through these steps many times.</p></div>
+
+<h2>3. Step 3 in action: data cleaning</h2>
+<p>Raw data is messy. Below is a small house table with four typical problems. Apply the fixes one at a time and watch the table change.</p>
+<div class="demo" data-title="Clean a messy table" id="demo-clean">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="cleanTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<pre class="code">
+import pandas as pd
+from sklearn.impute import SimpleImputer
+
+df = pd.read_csv("houses.csv")
+
+df.isna().sum()                      # count missing values per column
+df = df.drop_duplicates()            # remove exact duplicate rows
+df["city"] = df["city"].str.strip().str.title()   # 'pune ' -> 'Pune'
+
+# Fill missing numbers with the column median (robust to outliers)
+imputer = SimpleImputer(strategy="median")
+df[["bedrooms", "age"]] = imputer.fit_transform(df[["bedrooms", "age"]])
+
+# Outliers: clip to the IQR fences
+q1, q3 = df["area"].quantile([0.25, 0.75])
+iqr = q3 - q1
+df["area"] = df["area"].clip(q1 - 1.5 * iqr, q3 + 1.5 * iqr)
+</pre>
+<div class="callout math"><p><strong>The IQR outlier rule.</strong> Sort the values; Q1 is the 25th percentile and Q3 the 75th. IQR = Q3 − Q1. Anything above <em>Q3 + 1.5·IQR</em> or below <em>Q1 − 1.5·IQR</em> is flagged. For example, if Q1 = 1100 and Q3 = 1700 then IQR = 600 and the upper fence is 1700 + 900 = 2600. A house of 25,000 sq ft is far beyond it, probably a typo.</p></div>
+<p><strong>Ways to handle missing values:</strong> drop the row (if few), fill with mean/median (numbers), fill with the most frequent value (categories), predict it with another model (KNN imputer), or add an "is_missing" flag column when the fact of missingness is itself informative.</p>
+
+<h2>4. Step 4 in action: feature engineering</h2>
+<p><strong>Feature engineering</strong> creates new columns from existing ones so the model can see the pattern more easily. A model given <em>year_built</em> has to work out "older houses are cheaper" itself; give it <em>age</em> and the relationship is direct.</p>
+<div class="demo" data-title="Create new features" id="demo-fe">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="feTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<pre class="code">
+df["age"] = 2026 - df["year_built"]
+df["price_per_sqft"] = df["price"] / df["area"]      # careful: uses the target! (see leakage)
+df["rooms_total"] = df["bedrooms"] + df["bathrooms"]
+df["is_weekend_listing"] = df["listed_on"].dt.dayofweek >= 5
+</pre>
+<div class="callout warn"><p><strong>Leakage trap:</strong> a feature computed from the <em>target</em> (price_per_sqft uses price) is only fine for analysis. If you train on it the model "cheats" and performs brilliantly in the lab but fails in the real world, where price is exactly what you don't know yet. The demo above uses <em>area_per_bedroom</em>, which is safe.</p></div>
+<p>Other common feature-engineering moves: extracting day/month/hour from dates; binning ages into groups; ratios (income ÷ debt); interaction terms (area × location score); log-transforming skewed values; counting things (number of support tickets last month). Encoding categories and scaling numbers are covered in the Data Pre-processing lesson.</p>
+
+<h2>5. Step 5 in action: exploratory data analysis (EDA)</h2>
+<p>EDA means <em>analysing and visualising data to understand its structure, patterns, relationships and anomalies</em>. It helps you detect trends, outliers and data issues before you build anything. Pick a feature and see how it relates to house price.</p>
+<div class="demo" data-title="Explore a dataset of 80 houses" id="demo-eda">
+  <div class="controls" data-controls></div>
+  <div class="db" data-canvas></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p><strong>Correlation (Pearson r)</strong> is one number between −1 and +1 that says how well two columns move together in a straight line: +1 = perfectly together, 0 = unrelated, −1 = perfectly opposite.</p>
+<p><em>How to compute it, in 3 steps.</em> x = (1, 2, 3), y = (2, 4, 7).
+<br>① Subtract each average: x − 2 = (−1, 0, 1); y − 4.33 = (−2.33, −0.33, 2.67).
+<br>② Multiply the pairs and add: (−1)(−2.33) + 0 + (1)(2.67) = <strong>5.0</strong>.
+<br>③ Divide by the "size" of each column's changes: √(1+0+1) × √(5.44+0.11+7.11) = 1.414 × 3.56 = 5.03.
+<br>r = 5.0 ÷ 5.03 ≈ <strong>0.99</strong>, an almost perfect upward line. r near 0 means no straight-line link (a curve may still exist).</p></div>
+<pre class="code">
+df.describe()                     # count, mean, std, min, quartiles, max
+df.hist(figsize=(10, 6))          # distribution of every numeric column
+df.corr(numeric_only=True)["price"].sort_values()   # correlation with the target
+import seaborn as sns
+sns.pairplot(df[["area", "age", "price"]])
+</pre>
+
+<h2>6. Step 7 &amp; 8 in action: splitting, training and testing</h2>
+<p>To measure <em>generalisation</em> we hide part of the data during training. <strong>Training</strong> teaches the model by adjusting its parameters to minimise error on the training set. <strong>Testing</strong> evaluates the trained model on unseen data, giving an honest estimate of real-world performance.</p>
+<div class="demo" data-title="Train / test split" id="demo-split">
+  <div class="db" id="splitDots"></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<pre class="code">
+from sklearn.model_selection import train_test_split
+
+X = df.drop(columns="price")
+y = df["price"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,        # 20% held out for the final exam
+    random_state=42,      # fixes the shuffle so results are reproducible
+    # stratify=y,         # for classification: keep class ratios equal in both parts
+)
+</pre>
+<div class="callout warn"><p><strong>Split FIRST, then learn anything.</strong> Fit imputers, scalers and encoders on the <em>training</em> set only, then apply them to the test set. If the test set's mean leaks into the training preprocessing, your score is inflated. scikit-learn's <code>Pipeline</code> (below) does this automatically.</p></div>
+<p>A common three-way split is <strong>train / validation / test</strong>: use the validation part to compare models and tune hyperparameters, and touch the test set exactly once at the very end. <strong>Cross-validation</strong> (Grid Search CV lesson) gives more reliable estimates by rotating which part is held out.</p>
+
+<h3>How do we score the model? Metrics for regression</h3>
+<p>Drag the predicted values and watch each error metric respond. The table shows every calculation, number by number.</p>
+<div class="demo" data-title="Regression metrics by hand" id="demo-reg">
+  <div class="db"><div class="tw"><table id="regTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p>Call the <em>error</em> of one prediction (actual − predicted). In plain words:</p>
+<ul>
+<li><strong>MAE</strong> = the average of the errors ignoring their sign: the typical miss, in the original units.</li>
+<li><strong>MSE</strong> = the average of the squared errors (big misses count extra).</li>
+<li><strong>RMSE</strong> = √MSE, which brings the units back to those of y.</li>
+<li><strong>R²</strong> = 1 − (your model's total squared error ÷ the total squared error of the lazy guess "always predict the average"). 1 is perfect, 0 is no better than the lazy guess, negative is worse.</li>
+</ul></div>
+
+<h3>Metrics for classification</h3>
+<p>Accuracy alone can lie. Suppose 990 of 1,000 transactions are legitimate and 10 are fraud. A model that <em>always says "legit"</em> is 99% accurate and catches zero fraud. Use the confusion matrix and the metrics built from it.</p>
+<div class="demo" data-title="Confusion matrix playground" id="demo-cls">
+  <div class="controls" data-controls></div>
+  <div class="db"><div id="cm"></div></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p>Read the four boxes as: TP = caught positives, FP = false alarms, FN = missed positives, TN = correct negatives.</p>
+<ul>
+<li><strong>Accuracy</strong> = (TP + TN) ÷ everything: how often it is right overall.</li>
+<li><strong>Precision</strong> = TP ÷ (TP + FP): when it says "positive", how often is it right?</li>
+<li><strong>Recall</strong> = TP ÷ (TP + FN): of all the real positives, how many did it catch?</li>
+<li><strong>F1</strong> = one score that is high only when <em>both</em> precision and recall are high.</li>
+</ul>
+<p><em>Example.</em> TP = 8, FP = 2, FN = 4, TN = 86. Accuracy = 94 ÷ 100 = 94%. Precision = 8 ÷ 10 = 0.80. Recall = 8 ÷ 12 = 0.67. F1 = 2 × 0.80 × 0.67 ÷ (0.80 + 0.67) = 0.73.</p></div>
+<div class="tw"><table>
+<tr><th>Which error hurts more?</th><th>Optimise</th><th>Example</th></tr>
+<tr><td>Missing a real positive is costly</td><td><strong>Recall</strong></td><td>Cancer screening, fraud detection</td></tr>
+<tr><td>A false alarm is costly</td><td><strong>Precision</strong></td><td>Marking legitimate email as spam, sending a promo to the wrong people</td></tr>
+<tr><td>Both matter and classes are imbalanced</td><td><strong>F1</strong></td><td>Most imbalanced problems</td></tr>
+</table></div>
+<pre class="code">
+from sklearn.metrics import (mean_absolute_error, mean_squared_error, r2_score,
+                             accuracy_score, precision_score, recall_score,
+                             f1_score, confusion_matrix, classification_report)
+
+# Regression
+mean_absolute_error(y_test, pred)
+mean_squared_error(y_test, pred) ** 0.5     # RMSE
+r2_score(y_test, pred)
+
+# Classification
+confusion_matrix(y_test, pred)
+print(classification_report(y_test, pred))  # precision, recall, f1 per class
+</pre>
+<div class="callout tip"><p><strong>Want the full story?</strong> The next lessons build on this tour. The dedicated <strong>Evaluation Metrics</strong> lesson (right after Data Pre-processing) explains thresholds, ROC curves and AUC, precision–recall curves, multi-class averaging, log-loss, how to choose a metric from real costs, and how uncertain a test score is.</p></div>
+
+<h2>7. Step 6: choosing a model</h2>
+<p><strong>Model selection</strong> means choosing the most suitable algorithm for the problem and dataset, based on the data type, the expected performance, complexity and evaluation metrics. The goal is a model that <em>generalises well to unseen data</em>, not the one that looks best on training data.</p>
+<div class="tw"><table>
+<tr><th>If…</th><th>Try first</th></tr>
+<tr><td>Predicting a number, roughly linear, few features, need interpretability</td><td>Linear / Ridge / LASSO Regression</td></tr>
+<tr><td>Predicting a category, need probabilities and speed</td><td>Logistic Regression, Naïve Bayes</td></tr>
+<tr><td>Small dataset, non-linear boundaries</td><td>KNN, SVM</td></tr>
+<tr><td>Mixed data types, non-linear, want a strong default</td><td>Random Forest, Gradient Boosting / XGBoost</td></tr>
+<tr><td>Need human-readable rules</td><td>Decision Tree</td></tr>
+<tr><td>No labels</td><td>K-Means, DBSCAN, PCA…</td></tr>
+</table></div>
+<p><strong>Rule of thumb:</strong> always build a <em>baseline</em> first (predict the mean, or a plain linear model). If a complicated model can't clearly beat the baseline, it is not worth the complexity.</p>
+<div class="callout analogy"><p><strong>No free lunch.</strong> No single algorithm is best on every problem. Just as you would not use a sledgehammer to hang a picture or a screwdriver to break a wall, you match the tool to the job, then check with cross-validation.</p></div>
+
+<h2>8. Putting steps 3–8 into one scikit-learn <code>Pipeline</code></h2>
+<p>scikit-learn can bundle preprocessing and the model into one object, so the exact same transformations are applied in training, testing and production, and leakage is impossible.</p>
+<pre class="code">
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+
+df = pd.read_csv("houses.csv")
+X, y = df.drop(columns="price"), df["price"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+num_cols = ["area", "bedrooms", "age"]
+cat_cols = ["city"]
+
+preprocess = ColumnTransformer([
+    ("num", Pipeline([("impute", SimpleImputer(strategy="median")),
+                      ("scale", StandardScaler())]), num_cols),
+    ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols),
+])
+
+model = Pipeline([
+    ("prep", preprocess),
+    ("rf", RandomForestRegressor(n_estimators=200, random_state=42)),
+])
+
+model.fit(X_train, y_train)                    # step 7: training
+pred = model.predict(X_test)                   # step 8: testing
+print("MAE:", mean_absolute_error(y_test, pred))
+</pre>
+<p>Read it top to bottom: split → for numbers fill missing values then scale → for the city column one-hot encode → feed everything to a Random Forest. Each piece (imputer, scaler, encoder, forest) has its own lesson in this course.</p>
+
+<h2>9. Steps 9 &amp; 10: deployment and maintenance</h2>
+<p><strong>Deployment</strong> integrates the trained model into a real-world system so it can make predictions on new data. The model must be accessible, scalable and usable by end users. Typical options: a REST API (FastAPI/Flask), a web app (Streamlit; there is a lesson on this), a batch job that scores a database every night, a mobile app, or an edge device.</p>
+<pre class="code">
+import joblib
+joblib.dump(model, "house_price_model.joblib")     # save the entire pipeline
+
+model = joblib.load("house_price_model.joblib")    # later, inside your app
+model.predict(new_house_dataframe)
+</pre>
+<p><strong>Maintenance</strong> means monitoring the deployed model, keeping it performing well, and updating it to handle new data, changing patterns and <strong>performance drift</strong>. The world moves: interest rates change, buyers' tastes shift, and a sensor gets replaced. Two kinds of drift to know:</p>
+<ul>
+<li><strong>Data drift</strong>: the input distribution changes (suddenly many more luxury flats are listed).</li>
+<li><strong>Concept drift</strong>: the relationship between inputs and target changes (the same house now sells for less after a market crash).</li>
+</ul>
+<div class="demo" data-title="Monitor a deployed model and retrain when it decays" id="demo-drift">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>10. The workflow in the real world</h2>
+<div class="callout real"><p><strong>Ride-hailing ETA.</strong> <em>Problem:</em> predict trip time within 1 minute. <em>Data:</em> years of GPS pings, weather feeds, holidays. <em>Cleaning:</em> drop impossible speeds from GPS glitches. <em>Features:</em> hour of day, distance, live traffic index. <em>Model:</em> gradient-boosted trees. <em>Test:</em> mean error on last month's trips. <em>Deploy:</em> API answering in &lt; 100 ms. <em>Maintain:</em> retrain weekly, alert when error rises on a new city.</p></div>
+<div class="cards">
+<div class="card"><h4>🏦 Credit scoring</h4><p>Regulators require explainable models and fairness audits, so the "model selection" step favours logistic regression or monitored trees.</p></div>
+<div class="card"><h4>🏥 Healthcare</h4><p>Data collection needs consent and privacy; the test set must come from <em>different hospitals</em> than training to prove it generalises.</p></div>
+<div class="card"><h4>🛒 E-commerce</h4><p>Retrained daily because demand shifts with promotions and seasons; monitoring compares live predictions to actual sales.</p></div>
+<div class="card"><h4>🏭 Manufacturing</h4><p>Sensor data is noisy, so cleaning and feature engineering (rolling averages of vibration) matter more than the algorithm.</p></div>
+</div>
+<p><strong>Team roles you will meet:</strong> data engineers (collection, pipelines), data analysts (EDA), ML engineers / data scientists (features, models), MLOps engineers (deployment, monitoring), and domain experts who tell you whether the answers make sense.</p>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>The ten steps: <strong>problem → data collection → cleaning → feature engineering → EDA → model selection → training → testing → deployment → maintenance</strong>, repeated in a loop.</li>
+<li>Most of the effort and most of the gains come from the data steps, not the algorithm.</li>
+<li>Always <strong>split first</strong>, fit preprocessing on training data only, and use a <code>Pipeline</code>.</li>
+<li>Pick metrics that match the business cost of errors (accuracy alone can be misleading).</li>
+<li>A model is never "done": monitor for drift and retrain.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong> Run a mini workflow on a built-in dataset.</p>
+<ol>
+<li>Write a one-sentence <strong>problem statement</strong> for the California housing data: predict median house value from district statistics; success = RMSE below 0.7 (in $100k units).</li>
+<li>Load it with <code>from sklearn.datasets import fetch_california_housing</code> and <code>fetch_california_housing(as_frame=True).frame</code>. Run <code>.describe()</code> and <code>.corr()["MedHouseVal"]</code>. Which feature correlates most?</li>
+<li>Split 80/20, fit a <code>LinearRegression</code> as your <strong>baseline</strong>, then a <code>RandomForestRegressor</code>, and compare their RMSE on the test set.</li>
+</ol>
+<details><summary>What to expect</summary><p>Median income (<code>MedInc</code>) correlates most (r ≈ 0.69). Linear regression gives RMSE around 0.75; a random forest typically gets around 0.50 (exact numbers vary by version), so the extra model complexity earned its keep.</p></details>
+</div>
+
+</article>
+<script src="../js/topics.js"></script>
+<script src="../js/lib/viz.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/pages/workflow.js"></script>
+</body>
+</html>

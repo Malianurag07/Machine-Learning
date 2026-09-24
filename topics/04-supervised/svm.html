@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Vector Machine · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="svm">
+<article id="lesson">
+
+<h1>Support Vector Machine (SVM)</h1>
+<p class="lede">An SVM separates two classes with the <em>widest possible street</em> between them. Only the few points standing right at the edge of that street matter, and a clever trick called the kernel lets it draw curved boundaries too.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 95 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. The big idea: the widest street</h2>
+<p>Suppose two kinds of points can be separated by a straight line. There are <em>infinitely many</em> such lines (remember choosing among L1, L2, L3 in Linear Regression?). Some hug one class tightly and would misclassify a new point that lands slightly off. The SVM asks for the <strong>best</strong> line: the one that keeps the <strong>biggest safe distance from both classes</strong>.</p>
+<div class="callout analogy"><p><strong>Building a road between two villages.</strong> You must lay a road that separates the two villages so nobody's house is in the way. You want the road as <em>wide</em> as possible, so that even if a house is built a bit closer next year, it is still clearly on its own side. The centre line of the road is the decision boundary; the road's edges touch the nearest houses of each village. Those nearest houses are the <strong>support vectors</strong>: they "support" (hold up) the road. Houses deep inside the villages don't affect where the road goes at all.</p></div>
+<div class="tw"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td><strong>Hyperplane</strong> (decision boundary)</td><td>The dividing line in 2-D (a plane in 3-D, and so on). Points with w·x + b = 0.</td></tr>
+<tr><td><strong>Margin</strong></td><td>The width of the empty street between the classes. A wider margin usually generalises better.</td></tr>
+<tr><td><strong>Support vectors</strong></td><td>The training points lying on the edges of the street (or trespassing on it). They alone determine the boundary.</td></tr>
+<tr><td><strong>Score</strong> f(x) = w·x + b</td><td>Positive → class +1, negative → class −1. It equals exactly +1 on the positive edge, −1 on the negative edge, and 0 on the centre line.</td></tr>
+</table></div>
+<p>Drag the line's angle below. For every angle, the best-positioned line has some street width (right-hand graph). The SVM is simply the angle at the very top of that curve.</p>
+<div class="demo" data-title="Find the widest street" id="demo-margin">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>2. The maths of the margin, by hand</h2>
+<p>Label the classes <strong>+1</strong> and <strong>−1</strong>. A line is described by a weight vector w (which sets its direction) and an offset b. The <strong>score</strong> of a point is f(x) = w₁x₁ + w₂x₂ + b. We <em>scale</em> w and b so that the closest points score exactly +1 and −1. Then two facts follow:</p>
+<div class="callout math">
+<ul>
+<li>The street's edges are the lines f(x) = +1 and f(x) = −1, and the boundary is f(x) = 0.</li>
+<li><strong>Street width = 2 ÷ ‖w‖</strong>, where ‖w‖ = √(w₁² + w₂²) is the length of w. So <em>a wide street means a short w</em>.</li>
+</ul>
+<p>Therefore "find the widest street that keeps every point on its correct side" is the same as <strong>make ‖w‖ as small as possible, subject to: every class +1 point scores ≥ +1 and every class −1 point scores ≤ −1</strong>. This is what the SVM solves (a neat convex problem with a single best answer).</p></div>
+<h3>A complete worked example</h3>
+<p>Six points, three per class:</p>
+<div class="tw"><table>
+<tr><th>Point</th><th class="num">x₁</th><th class="num">x₂</th><th>Class</th></tr>
+<tr><td>A</td><td class="num">1</td><td class="num">1</td><td>−1</td></tr>
+<tr><td>B</td><td class="num">2</td><td class="num">2</td><td>−1</td></tr>
+<tr><td>C</td><td class="num">3</td><td class="num">0</td><td>−1</td></tr>
+<tr><td>D</td><td class="num">4</td><td class="num">4</td><td>+1</td></tr>
+<tr><td>E</td><td class="num">5</td><td class="num">4</td><td>+1</td></tr>
+<tr><td>F</td><td class="num">5</td><td class="num">5</td><td>+1</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Step 1: find the closest pair from opposite classes.</strong> That is B(2, 2) and D(4, 4), at distance √(2² + 2²) = 2.83. These will be the support vectors.</p>
+<p><strong>Step 2: the boundary is the perpendicular bisector of that pair.</strong> Their midpoint is (3, 3), and the direction from B to D is (1, 1). So the boundary is the line x₁ + x₂ = 6.</p>
+<p><strong>Step 3: scale so the edges score ±1.</strong> Write f(x) = a·x₁ + a·x₂ + b. We need f(B) = −1 and f(D) = +1:
+<br>4a + b = −1 and 8a + b = +1 → subtract: 4a = 2, so <strong>a = 0.5</strong> and <strong>b = −3</strong>.
+<br>So <strong>w = (0.5, 0.5), b = −3</strong> and f(x) = 0.5·x₁ + 0.5·x₂ − 3.</p>
+<p><strong>Step 4: check every point.</strong></p>
+<div class="tw"><table>
+<tr><th>Point</th><th>f = 0.5x₁ + 0.5x₂ − 3</th><th class="num">Score</th><th>Verdict</th></tr>
+<tr><td>A (1,1)</td><td>0.5 + 0.5 − 3</td><td class="num">−2.0</td><td>correct, well outside the street</td></tr>
+<tr><td><b>B (2,2)</b></td><td>1 + 1 − 3</td><td class="num"><b>−1.0</b></td><td><b>on the edge: support vector</b></td></tr>
+<tr><td>C (3,0)</td><td>1.5 + 0 − 3</td><td class="num">−1.5</td><td>correct, outside</td></tr>
+<tr><td><b>D (4,4)</b></td><td>2 + 2 − 3</td><td class="num"><b>+1.0</b></td><td><b>on the edge: support vector</b></td></tr>
+<tr><td>E (5,4)</td><td>2.5 + 2 − 3</td><td class="num">+1.5</td><td>correct, outside</td></tr>
+<tr><td>F (5,5)</td><td>2.5 + 2.5 − 3</td><td class="num">+2.0</td><td>correct, outside</td></tr>
+</table></div>
+<p><strong>Step 5: the street width.</strong> ‖w‖ = √(0.5² + 0.5²) = 0.707, so width = 2 ÷ 0.707 = <strong>2.83</strong>, exactly the distance between B and D, as it should be.</p>
+<p><strong>Only 2 of the 6 points matter.</strong> Delete A, C, E and F and you get exactly the same line. Move them (without crossing the street) and nothing changes.</p>
+<p><strong>Step 6: predict.</strong> New point (6, 5): f = 0.5·6 + 0.5·5 − 3 = <strong>2.5</strong> → positive → class +1. New point (3, 3): f = 0 → exactly on the boundary.</p></div>
+<div class="callout tip"><p><strong>How the support vectors build w.</strong> Each support vector gets an importance weight α (alpha). Here α<sub>B</sub> = α<sub>D</sub> = 0.25 and every other point has α = 0. Then w = Σ α × class × point = 0.25 × (+1) × (4, 4) + 0.25 × (−1) × (2, 2) = (1, 1) − (0.5, 0.5) = (0.5, 0.5). ✔. And the score of a new point uses only dot products with the support vectors: f(x) = Σ α × class × (support vector · x) + b. For (6, 5): 0.25 × (4·6 + 4·5) − 0.25 × (2·6 + 2·5) − 3 = 11 − 5.5 − 3 = 2.5 ✔. This "only dot products" property is what makes the <em>kernel trick</em> possible (section 4).</p></div>
+
+<h2>3. Real data overlaps: the soft margin and C</h2>
+<p>Real classes are rarely perfectly separable: a few points sit on the wrong side, or inside the street. Insisting on a perfect street (a <strong>hard margin</strong>) either fails or produces a razor-thin street twisted around a few odd points. The fix is the <strong>soft margin</strong>: allow some points to trespass, but charge a fine for each.</p>
+<div class="callout math"><p><strong>The trade-off, in words:</strong> minimise ( a term that rewards a wide street ) + <strong>C</strong> × ( total trespass distance of all the points ).</p>
+<ul>
+<li><strong>Large C</strong> = a heavy fine for trespassing: the street becomes narrow and twisty to keep every training point on the right side (strict, risks overfitting).</li>
+<li><strong>Small C</strong> = a light fine: a wide, relaxed street that tolerates some mistakes (smoother, risks underfitting).</li>
+</ul>
+<p>The fine for a point is the <strong>hinge loss</strong>: max(0, 1 − y·f(x)) where y is +1 or −1 and f is the score.</p>
+<div class="tw"><table>
+<tr><th>Situation</th><th class="num">y × f(x)</th><th class="num">Hinge loss</th></tr>
+<tr><td>True class +1, score +1.7: correct and outside the street</td><td class="num">1.7</td><td class="num"><b>0</b></td></tr>
+<tr><td>True class +1, score +0.4: correct side, but inside the street</td><td class="num">0.4</td><td class="num"><b>0.6</b></td></tr>
+<tr><td>True class +1, score −0.5: wrong side</td><td class="num">−0.5</td><td class="num"><b>1.5</b></td></tr>
+<tr><td>True class −1, score −2: correct and outside</td><td class="num">2</td><td class="num"><b>0</b></td></tr>
+</table></div>
+<p>Points that are safely correct cost nothing; the loss grows the further a point is on the wrong side. Points with a non-zero loss (inside or across the street), plus those exactly on the edge, are the support vectors.</p></div>
+<div class="demo" data-title="The C dial: strict street vs. relaxed street" id="demo-soft">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class +1</span><span><i style="background:var(--c2)"></i>class −1</span><span>ringed points = support vectors · solid line = boundary · dashed lines = street edges</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>At <strong>small C</strong> the street is wide and lots of points are support vectors (they all lean on it). At <strong>large C</strong> the street shrinks and gets pulled around individual points. Click on the plot to add points, especially an outlier deep inside the other class, and see how differently a strict and a relaxed SVM react.</p>
+
+<h2>4. When a straight line isn't enough: the kernel trick</h2>
+<p>What if one class surrounds the other, like a bullseye? No straight line can separate them. But watch what happens if we give each point an <em>extra feature</em>.</p>
+<h3>A one-dimensional example</h3>
+<p>Points on a number line: class +1 at x = −1, 0, 1 (in the middle); class −1 at x = −3, −2, 2, 3 (on both sides). One cut can't separate them, because the +1 group is sandwiched. Now add a second feature, x²:</p>
+<div class="tw"><table>
+<tr><th class="num">x</th><td class="num">−3</td><td class="num">−2</td><td class="num">−1</td><td class="num">0</td><td class="num">1</td><td class="num">2</td><td class="num">3</td></tr>
+<tr><th class="num">new feature x²</th><td class="num">9</td><td class="num">4</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">4</td><td class="num">9</td></tr>
+<tr><th>class</th><td class="num">−1</td><td class="num">−1</td><td class="num">+1</td><td class="num">+1</td><td class="num">+1</td><td class="num">−1</td><td class="num">−1</td></tr>
+</table></div>
+<p>In the (x, x²) plane every +1 point has x² ≤ 1 and every −1 point has x² ≥ 4. A <strong>flat, straight line at x² = 2.5</strong> now separates them perfectly. Mapped back to the original line, that straight cut becomes "the middle zone −1.58 &lt; x &lt; 1.58", a curved boundary in disguise.</p>
+<div class="demo" data-title="Lift the points into a new dimension" id="demo-lift">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The idea: <strong>map the data into a higher-dimensional space where a straight line does work</strong>, then bring the boundary back. The catch is that mapping to many dimensions explicitly is expensive (sometimes infinite!). The <strong>kernel trick</strong> avoids ever building those new coordinates. Remember that the SVM only ever needs <em>dot products</em> between points. A <strong>kernel function</strong> K(x, z) returns the dot product <em>as it would be in the high-dimensional space</em>, computed cheaply from the original points. You just replace every dot product with K.</p>
+<div class="tw"><table>
+<tr><th>Kernel</th><th>In words</th><th>Use</th></tr>
+<tr><td><strong>Linear</strong></td><td>K(x, z) = x · z (no mapping at all)</td><td>High-dimensional data such as text; when a line is enough</td></tr>
+<tr><td><strong>Polynomial</strong></td><td>K(x, z) = (γ · x·z + 1)<sup>d</sup>, curves up to degree d</td><td>Interactions between features</td></tr>
+<tr><td><strong>RBF</strong> (Gaussian), the usual default</td><td>K(x, z) = exp(−γ · distance²): a <em>similarity score</em>, 1 when the points coincide, fading to 0 as they move apart</td><td>General-purpose non-linear boundaries</td></tr>
+</table></div>
+<div class="callout math"><p><strong>RBF by hand.</strong> x = (1, 2) and z = (2, 4): squared distance = (1−2)² + (2−4)² = 1 + 4 = 5.
+<br>γ = 0.1 → K = exp(−0.1 × 5) = exp(−0.5) = <strong>0.607</strong> (still fairly similar).
+<br>γ = 1 → K = exp(−5) = <strong>0.007</strong> (practically unrelated).
+<br>So γ sets how far the "influence" of a point reaches. With RBF the score of a new point is a weighted vote of its <em>similarities to the support vectors</em>: f(x) = Σ α × class × K(support vector, x) + b.</p></div>
+<div class="callout analogy"><p><strong>Landmarks.</strong> Picture each support vector as a lighthouse casting a circle of influence on the map. A new point is classified by asking how strongly each lighthouse "sees" it, with lighthouses of the +1 team pushing the vote one way and lighthouses of the −1 team the other. A big γ means small, sharp lighthouse beams (the boundary hugs individual points, overfitting); a small γ means broad beams that blur together into a smooth boundary.</p></div>
+<p>Two knobs now control the RBF SVM: <strong>C</strong> (how strictly to punish mistakes) and <strong>γ</strong> (how local the influence is). Explore them on three shapes of data:</p>
+<div class="demo" data-title="Kernels, C and γ on curved data" id="demo-kernel">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class +1</span><span><i style="background:var(--c2)"></i>class −1</span><span>filled = training · hollow = test · ringed = support vectors · shading = predicted class</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Circles + linear kernel:</strong> hopeless (around 50%). Switch to RBF: near-perfect.</li>
+<li><strong>Large γ:</strong> tiny islands around each training point; training accuracy soars while test accuracy drops (overfitting).</li>
+<li><strong>Tiny γ:</strong> the boundary is almost straight (underfitting).</li>
+<li>The best pair (C, γ) is found by <strong>cross-validation</strong> with <code>GridSearchCV</code>, typically on a logarithmic grid such as 0.01, 0.1, 1, 10, 100.</li>
+</ul>
+
+<h2>5. SVM in scikit-learn</h2>
+<p>Our worked example, reproduced (a huge C approximates the hard margin):</p>
+<pre class="code">
+from sklearn.svm import SVC
+
+X = [[1, 1], [2, 2], [3, 0], [4, 4], [5, 4], [5, 5]]
+y = [-1, -1, -1, 1, 1, 1]
+
+svm = SVC(kernel="linear", C=1e6).fit(X, y)
+
+print(svm.coef_)                 # about [[0.5 0.5]]     -> w
+print(svm.intercept_)            # about [-3.]           -> b
+print(svm.support_vectors_)      # [[2. 2.] [4. 4.]]     -> only B and D matter
+print(svm.n_support_)            # [1 1]                 -> one per class
+print(svm.decision_function([[3, 3], [6, 5]]))   # about [0.  2.5]  -> the scores f(x)
+print(svm.predict([[6, 5], [1, 0]]))             # [ 1 -1]
+</pre>
+<p>These are exactly the numbers from the hand calculation. Now the usual real-world recipe: <strong>scale the features</strong> (SVMs are distance-based, like KNN), then tune C and γ with cross-validation:</p>
+<pre class="code">
+from sklearn.datasets import make_circles, load_breast_cancer
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+# non-linear toy data: one ring inside another
+Xc, yc = make_circles(n_samples=300, noise=0.1, factor=0.4, random_state=0)
+print(SVC(kernel="linear").fit(Xc, yc).score(Xc, yc))   # poor: about 0.5
+print(SVC(kernel="rbf").fit(Xc, yc).score(Xc, yc))      # close to 1.0
+
+# realistic data: tune C and gamma
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+pipe = Pipeline([("scale", StandardScaler()), ("svm", SVC(kernel="rbf"))])
+grid = GridSearchCV(pipe, {"svm__C": [0.1, 1, 10, 100],
+                           "svm__gamma": ["scale", 0.001, 0.01, 0.1]}, cv=5)
+grid.fit(X_train, y_train)
+print(grid.best_params_, grid.score(X_test, y_test))
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter / method</th><th>What it does</th></tr>
+<tr><td><code>kernel</code></td><td><code>"linear"</code>, <code>"rbf"</code> (default), <code>"poly"</code>, <code>"sigmoid"</code>.</td></tr>
+<tr><td><code>C</code></td><td>Penalty for trespassing (default 1.0). Bigger = stricter, narrower street. Search on a log scale.</td></tr>
+<tr><td><code>gamma</code></td><td>Reach of each point's influence for RBF/poly. <code>"scale"</code> (default) picks a sensible value from your data; bigger = more local = more overfit.</td></tr>
+<tr><td><code>degree</code></td><td>Polynomial degree (poly kernel only).</td></tr>
+<tr><td><code>class_weight="balanced"</code></td><td>Punish mistakes on the rare class more.</td></tr>
+<tr><td><code>probability=True</code></td><td>Also enable <code>predict_proba</code> (slower: it runs an internal cross-validation).</td></tr>
+<tr><td><code>support_vectors_</code>, <code>n_support_</code></td><td>Which training points define the model, and how many per class.</td></tr>
+<tr><td><code>LinearSVC</code>, <code>SGDClassifier(loss="hinge")</code></td><td>Much faster linear SVMs for very large datasets.</td></tr>
+<tr><td><code>SVR</code></td><td>Regression version: fits a tube of width ε around the data and ignores points inside it.</td></tr>
+</table></div>
+<p><strong>More than two classes:</strong> an SVM is inherently two-class; scikit-learn handles several classes automatically by training a classifier for each pair of classes ("one-vs-one") and letting them vote.</p>
+
+<h2>6. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Excellent on small and medium datasets, especially with many features</td><td>Training slows down sharply on very large data (roughly quadratic or worse in the number of samples)</td></tr>
+<tr><td>The max-margin idea resists overfitting; only support vectors matter</td><td>Needs feature scaling and tuning of C and γ</td></tr>
+<tr><td>Kernels give flexible non-linear boundaries</td><td>Hard to interpret with a non-linear kernel; no direct probabilities</td></tr>
+<tr><td>Linear SVMs are fast and strong for text</td><td>Sensitive to noisy labels when C is large</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>📝 Text classification</h4><p>Spam filtering, sentiment and topic tagging: a linear SVM on word features is a classic, hard-to-beat baseline.</p></div>
+<div class="card"><h4>🧬 Bioinformatics</h4><p>Classifying tumours from thousands of gene-expression measurements with only a few hundred patients.</p></div>
+<div class="card"><h4>🖼️ Image recognition</h4><p>Before deep learning, SVMs on hand-crafted image features were the standard for object and pedestrian detection.</p></div>
+<div class="card"><h4>✍️ Handwriting</h4><p>Digit and character recognition with polynomial or RBF kernels was a showcase for SVMs.</p></div>
+<div class="card"><h4>🕵️ Anomaly detection</h4><p><code>OneClassSVM</code> learns the region where "normal" data lives and flags anything outside it.</p></div>
+<div class="card"><h4>🏥 Medical diagnosis</h4><p>Small, high-dimensional clinical datasets where margins and regularisation keep the model honest.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>SVM finds the boundary with the <strong>widest margin</strong> (street width = 2 ÷ ‖w‖); only the <strong>support vectors</strong> at the street's edge decide it.</li>
+<li>The <strong>score</strong> f(x) = w·x + b: the sign gives the class, and |f| ≥ 1 means "outside the street".</li>
+<li><strong>Soft margin:</strong> <strong>C</strong> is the fine for trespassing: large C = strict and narrow (overfit risk), small C = relaxed and wide.</li>
+<li>The <strong>kernel trick</strong> gets curved boundaries by working as if the data were in a higher dimension, using only kernel similarities. <strong>RBF</strong> is the default; <strong>γ</strong> controls how local it is.</li>
+<li>Always <strong>scale</strong> features and tune (C, γ) with cross-validation.</li>
+<li>Great for small/medium, high-dimensional data; slow for huge datasets (use <code>LinearSVC</code>).</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A trained SVM has w = (0.5, 0.5) and b = −3. Compute the score f and the predicted class for the points (3, 1), (6, 5) and (2, 3). Which of them lies exactly on a street edge?</li>
+<li>What is the width of the street for w = (0.6, 0.8)? (Hint: first find ‖w‖.)</li>
+<li>A point with true class +1 gets a score of 0.4. What is its hinge loss? What if its score were 1.6, or −0.3?</li>
+<li>Compute the RBF kernel value between (0, 0) and (3, 4) for γ = 0.02.</li>
+<li>Bonus: run the code above. Which of C and γ makes the training score go up but the test score go down when you increase it a lot?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> (3, 1): 1.5 + 0.5 − 3 = <b>−1</b> → class −1, exactly on the negative edge. (6, 5): 3 + 2.5 − 3 = <b>2.5</b> → +1. (2, 3): 1 + 1.5 − 3 = <b>−0.5</b> → class −1 but inside the street (|f| &lt; 1).</p>
+<p><b>2.</b> ‖w‖ = √(0.36 + 0.64) = 1, so width = 2 ÷ 1 = <b>2</b>.</p>
+<p><b>3.</b> Hinge = max(0, 1 − y·f): with f = 0.4 → <b>0.6</b>; f = 1.6 → <b>0</b>; f = −0.3 → <b>1.3</b>.</p>
+<p><b>4.</b> Squared distance = 9 + 16 = 25; K = exp(−0.02 × 25) = exp(−0.5) = <b>0.607</b>.</p>
+<p><b>5.</b> Increasing <b>γ</b> a lot (and, to a lesser degree, C) typically drives training accuracy towards 100% while test accuracy falls: overfitting.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/lib/svm.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/svm.js"></script>
+</body>
+</html>

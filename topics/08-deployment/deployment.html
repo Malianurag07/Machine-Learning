@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploying ML Models · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="deploy">
+<article id="lesson">
+
+<h1>Deploying ML Models</h1>
+<p class="lede">A model that lives only in a notebook helps nobody. <strong>Deployment</strong> means putting a trained model where real users or systems can use it, reliably and safely, and then keeping it healthy over time. This lesson follows the whole journey: saving the model, serving it through an API, packaging it, releasing it safely, and watching it once it is live.</p>
+<div class="meta"><span class="chip">Practical</span><span class="chip plain">≈ 100 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: from notebook to real life</h2>
+<div class="callout analogy"><p><strong>The test kitchen and the restaurant.</strong> A chef perfects a recipe in a test kitchen: that is training a model. Serving it to a thousand diners every night is a different job. You need the same ingredients delivered in the same form every time (consistent inputs), staff who can cook it fast (servers), someone tasting dishes to check quality (monitoring), and a plan for when the supplier changes or tastes shift (retraining). A great recipe with no kitchen system fails; a good recipe with a good system succeeds. Deployment is building that system around the model.</p></div>
+<p>Deployment is not one step but a cycle:</p>
+<div class="tw"><table>
+<tr><th>Stage</th><th>Question it answers</th><th>Section</th></tr>
+<tr><td><strong>1. Train and validate</strong></td><td>Is the model good enough? (the earlier lessons and Evaluation Metrics)</td><td>—</td></tr>
+<tr><td><strong>2. Package</strong></td><td>Can the model, its preprocessing and its environment be saved and reproduced exactly?</td><td>3, 5</td></tr>
+<tr><td><strong>3. Serve</strong></td><td>How do other programs or people ask it for a prediction?</td><td>4</td></tr>
+<tr><td><strong>4. Release</strong></td><td>Where does it run, and how do we introduce it without breaking things?</td><td>6, 7</td></tr>
+<tr><td><strong>5. Monitor</strong></td><td>Is it still working as well as on day one?</td><td>8</td></tr>
+<tr><td><strong>6. Improve</strong></td><td>When and how do we retrain and replace it?</td><td>8</td></tr>
+</table></div>
+
+<h2>2. How will predictions be used? Deployment patterns</h2>
+<p>The first design decision is <em>when</em> the prediction is needed.</p>
+<div class="tw"><table>
+<tr><th>Pattern</th><th>How it works</th><th>Example</th><th>Good for</th></tr>
+<tr><td><strong>Batch</strong></td><td>A scheduled job scores many rows at once (say every night) and stores the results</td><td>weekly customer-churn scores, nightly demand forecasts</td><td>simple, cheap, efficient; predictions can be a little stale</td></tr>
+<tr><td><strong>Real-time (online) API</strong></td><td>A service answers one request at a time within milliseconds</td><td>approving a card payment, ranking search results</td><td>fresh, personalised answers; needs a reliable always-on service</td></tr>
+<tr><td><strong>Streaming</strong></td><td>Predictions are made continuously on a flow of events</td><td>monitoring sensor readings, live fraud alerts</td><td>constant event streams</td></tr>
+<tr><td><strong>Edge / on-device</strong></td><td>The model runs on the phone, camera or machine itself</td><td>keyboard suggestions, face unlock, factory cameras</td><td>no network needed, low latency, privacy; limited memory and power</td></tr>
+<tr><td><strong>Interactive app</strong></td><td>A small web app lets a person try the model (the next lesson: Streamlit)</td><td>an analyst's what-if tool, a demo for stakeholders</td><td>internal tools, prototypes</td></tr>
+</table></div>
+<p><strong>A useful measurement.</strong> Timing a logistic-regression pipeline in scikit-learn 1.9.0 on my machine: predicting <b>one row</b> took about <b>0.42 milliseconds</b>, but predicting <b>4,500 rows in a single call</b> took about <b>0.73 milliseconds</b> in total. Models are vectorised: handing them many rows at once is enormously more efficient per row, which is why batch jobs are cheap and why online services sometimes group several requests together. And a complete request through a web framework (below) took about <b>6.7 ms</b>: for small models the surrounding service, not the model, is usually the slow part.</p>
+
+<h2>3. Step 1: save the model properly</h2>
+<h3>Save the whole pipeline, not just the model</h3>
+<p>The number-one deployment bug is <strong>training–serving skew</strong>: the data is prepared one way during training and slightly differently in production (a different scaling, a category encoded in another order, a missing value filled differently). The model then silently gets inputs it was not trained for. The cure, from the ML Workflow lesson: put every preprocessing step and the model into one scikit-learn <code>Pipeline</code>, and save <em>that</em>. The saved object then contains the fitted scaler's means, the encoder's categories and the model's weights together.</p>
+<h3>joblib and pickle</h3>
+<p>Python objects are saved with <strong>pickle</strong>; <strong>joblib</strong> is a version of the same idea tuned for objects with big NumPy arrays, which is why scikit-learn recommends it. Here is a real run (scikit-learn 1.9.0, joblib 1.5.3):</p>
+<pre class="code">
+import joblib, json, sklearn
+from sklearn.datasets import load_iris
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+data = load_iris()
+X_train, X_test, y_train, y_test = train_test_split(data.data, data.target, stratify=data.target, random_state=42)
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X_train, y_train)
+print(pipe.score(X_test, y_test))                      # 0.9211
+
+joblib.dump(pipe, "iris_model.joblib")                 # ~1.6 KB for this tiny model
+loaded = joblib.load("iris_model.joblib")              # takes about 15 ms
+print((loaded.predict(X_test) == pipe.predict(X_test)).all())      # True: identical predictions
+
+# save the facts you will need later next to the model (versions, feature order, metrics)
+json.dump({"sklearn": sklearn.__version__, "features": list(data.feature_names),
+           "classes": list(data.target_names), "test_accuracy": 0.9211}, open("iris_model.json", "w"))
+</pre>
+<p>Model files can be big: a random forest of 300 trees on the same data was <b>562 KB</b>, and <b>78 KB</b> with <code>joblib.dump(model, path, compress=3)</code>. Large models (thousands of deep trees, neural networks) reach hundreds of megabytes, which matters for start-up time and cost.</p>
+<div class="callout warn"><p><strong>Security: never load a pickle from somebody you do not trust.</strong> Loading a pickle file can run arbitrary code hidden inside it, exactly as if you had run their program. Only load model files that you created or that come from a trusted, verified source. Safer formats exist: <strong>skops</strong> (a persistence format for scikit-learn models that lets you inspect what will be loaded), and <strong>ONNX</strong> (a standard, Python-free model format that runs in a fast runtime on servers, phones and browsers). Neural-network libraries have their own formats (Keras, PyTorch, XGBoost's JSON), and tools such as MLflow provide a <em>model registry</em> that keeps versions, metrics and files together. I list those without demonstrating them here.</p></div>
+<p><strong>Match the versions.</strong> A pickled model is tied to the library version that made it. Record the scikit-learn, Python and NumPy versions with the model (as in the JSON file above) and load it in the same environment. scikit-learn warns you if the version differs, and a different version may give different results or fail to load.</p>
+
+<h2>4. Step 2: serve it through an API</h2>
+<p>An <strong>API</strong> (application programming interface) lets one program ask another for something over the network. For ML the usual choice is a <strong>web API</strong>: your model sits behind a web address ("endpoint"); a client sends a request containing the input as <strong>JSON</strong> (a plain-text format of named values), and the service replies with the prediction, also as JSON. The two most popular Python tools are <strong>FastAPI</strong> and <strong>Flask</strong>. Here is a complete FastAPI service for the iris model, which I ran and tested with FastAPI's built-in test client (fastapi 0.141.1, pydantic 2.13.5):</p>
+<pre class="code">
+# app.py
+import joblib
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Iris service")
+model = joblib.load("iris_model.joblib")                 # load ONCE when the service starts, not on every request
+CLASSES = ["setosa", "versicolor", "virginica"]
+
+class Flower(BaseModel):                                 # the "schema": what a valid request looks like
+    sepal_length: float = Field(gt=0, lt=20)
+    sepal_width:  float = Field(gt=0, lt=20)
+    petal_length: float = Field(gt=0, lt=20)
+    petal_width:  float = Field(gt=0, lt=20)
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "model_version": "1.0"}
+
+@app.post("/predict")
+def predict(f: Flower):
+    proba = model.predict_proba([[f.sepal_length, f.sepal_width, f.petal_length, f.petal_width]])[0]
+    k = int(proba.argmax())
+    return {"species": CLASSES[k], "probability": round(float(proba[k]), 4)}
+
+@app.post("/predict_batch")
+def predict_batch(items: list[Flower]):
+    if len(items) > 1000:
+        raise HTTPException(413, "too many rows")
+    rows = [[i.sepal_length, i.sepal_width, i.petal_length, i.petal_width] for i in items]
+    return {"species": [CLASSES[k] for k in model.predict(rows)]}
+
+# run it:   uvicorn app:app --host 0.0.0.0 --port 8000
+# FastAPI also generates interactive documentation at /docs (I listed the routes it generates; I did not open the page)
+</pre>
+<p>What the service returned in my test:</p>
+<pre class="code">
+GET  /health                                   -> 200 {"status": "ok", "model_version": "1.0"}
+POST /predict {5.1, 3.5, 1.4, 0.2}              -> 200 {"species": "setosa", "probability": 0.9811}
+POST /predict {6.7, 3.0, 5.2, 2.3}              -> 200 {"species": "virginica", "probability": 0.9532}
+POST /predict (petal_width missing)             -> 422 {"detail": [{"type": "missing", "loc": ["body", "petal_width"], "msg": "Field required"}]}
+POST /predict (sepal_length = "abc")            -> 422 ... "Input should be a valid number, unable to parse string as a number"
+POST /predict (sepal_length = -5)               -> 422 ... "Input should be greater than 0"
+POST /predict_batch (two flowers)               -> 200 {"species": ["setosa", "virginica"]}
+</pre>
+<p>Three ideas are at work: <strong>load once</strong> (reading the model file for every request would be slow), <strong>validate every input</strong> (the schema rejects missing, mistyped or impossible values before the model ever sees them), and <strong>return a clear, structured answer</strong>. Follow one request through the whole service:</p>
+<div class="demo" data-title="The life of one prediction request" id="demo-request">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Try the last option, "valid but absurd". A flower with a 19 cm petal passes the validation (the limit is 20) and the model answers <b>virginica with 100% probability</b>, because it extrapolates its straight-line rules far beyond any flower it has seen (the scaled value is 8.6 standard deviations from the training average). <em>Validation checks the shape of an input; it does not check whether the model can be trusted on it.</em> Sensible safeguards: ranges taken from the training data, an "out-of-distribution" flag when values are far from what was seen, and a human or default fallback when the model is unsure.</p>
+<div class="tw"><table>
+<tr><th>HTTP status</th><th>Meaning</th></tr>
+<tr><td><b>200</b></td><td>OK: here is your prediction</td></tr>
+<tr><td><b>400 / 422</b></td><td>The request was bad or failed validation (FastAPI uses 422)</td></tr>
+<tr><td><b>401 / 403</b></td><td>Not logged in / not allowed</td></tr>
+<tr><td><b>404</b></td><td>No such endpoint</td></tr>
+<tr><td><b>413 / 429</b></td><td>Request too large / too many requests (rate limit)</td></tr>
+<tr><td><b>500</b></td><td>Something broke inside the service (a bug on your side)</td></tr>
+</table></div>
+
+<h2>5. Step 3: package it so it runs the same everywhere</h2>
+<p>"It works on my machine" is the classic deployment failure: the server has a different Python or library version. Two remedies:</p>
+<ul>
+<li><strong>Pin the environment:</strong> a <code>requirements.txt</code> listing exact versions (for example <code>scikit-learn==1.9.0</code>, <code>fastapi==0.141.1</code>, <code>joblib==1.5.3</code>), installed in a fresh virtual environment.</li>
+<li><strong>Use a container (Docker):</strong> a container bundles your code, the Python version and all libraries into one image that runs identically on your laptop, a colleague's, and a cloud server. A minimal recipe (a <code>Dockerfile</code>):</li>
+</ul>
+<pre class="code">
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py iris_model.joblib ./
+EXPOSE 8000
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# build and run (I have not run Docker for this course, so treat this file as a standard template to test yourself):
+#   docker build -t iris-service .
+#   docker run -p 8000:8000 iris-service
+</pre>
+<p>Also add <strong>automated tests</strong>: a few requests with known answers (like the ones above) that must pass before any release, so a broken model or a changed library is caught early.</p>
+
+<h2>6. Step 4: where does it run?</h2>
+<div class="tw"><table>
+<tr><th>Option</th><th>What it is</th><th>Good for</th></tr>
+<tr><td>Your own server or a cloud virtual machine</td><td>you rent a computer and run the container or the service on it</td><td>full control; you manage updates and scaling</td></tr>
+<tr><td>Platform-as-a-service (Render, Railway, Heroku-style hosts, Hugging Face Spaces)</td><td>you push code or a container; the platform runs it</td><td>small services, demos, first deployments</td></tr>
+<tr><td>Container services (Cloud Run, Kubernetes, ECS)</td><td>run containers with automatic scaling</td><td>production services with variable traffic</td></tr>
+<tr><td>Serverless functions (AWS Lambda, Cloud Functions)</td><td>your code runs only when a request arrives; you pay per call</td><td>light, bursty workloads; watch for cold starts and size limits</td></tr>
+<tr><td>Managed ML platforms (SageMaker, Vertex AI, Azure ML, Databricks)</td><td>the cloud provider handles training, hosting, scaling and monitoring tools</td><td>teams with many models</td></tr>
+<tr><td>Edge devices (TensorFlow Lite, ONNX Runtime, Core ML)</td><td>a compressed model on the phone or device</td><td>offline use, privacy, ultra-low latency</td></tr>
+</table></div>
+<p>What to weigh: <strong>latency</strong> (how quickly must it answer?), <strong>traffic and cost</strong> (requests per second; idle servers still cost money), <strong>scaling</strong> (run several copies behind a load balancer), <strong>data privacy</strong> (can the data leave the device or country?), and <strong>the skills of your team</strong> (a simple platform you can operate beats a sophisticated one you cannot). I name the services above as common examples; I have not tested them in this course.</p>
+
+<h2>7. Step 5: release it without breaking things</h2>
+<p>Do not switch everyone to a new model at once. Introduce it in stages, and always keep the old version ready:</p>
+<ul>
+<li><strong>Shadow mode:</strong> the new model receives real requests and makes predictions, but nobody sees them; you compare them with the current model and with what really happened.</li>
+<li><strong>Canary release:</strong> send a small share (say 5%) of traffic to the new model and watch errors and business numbers before increasing.</li>
+<li><strong>A/B test:</strong> split users between old and new and measure a business outcome (clicks, savings) with a proper statistical comparison: remember the wobble of small samples from the Evaluation Metrics lesson.</li>
+<li><strong>Rollback:</strong> keep the previous model version and a tested way to switch back in minutes.</li>
+<li><strong>Versioning:</strong> every deployed model has a version number, linked to the code, the data and the metrics it was built with, so any prediction can be traced.</li>
+</ul>
+
+<h2>8. Step 6: monitor and improve</h2>
+<p>Unlike ordinary software, a model can be running perfectly (no errors) while its predictions quietly get worse, because <strong>the world changes</strong>. Things to watch:</p>
+<div class="tw"><table>
+<tr><th>What</th><th>Examples</th><th>Why</th></tr>
+<tr><td><strong>System health</strong></td><td>response time, error rate, memory, requests per second</td><td>the service itself must work</td></tr>
+<tr><td><strong>Data quality</strong></td><td>missing values, out-of-range numbers, new categories, wrong types</td><td>upstream systems change without warning</td></tr>
+<tr><td><strong>Data drift</strong></td><td>the distribution of an input feature moves away from what the model was trained on</td><td>the model may be extrapolating; an early warning</td></tr>
+<tr><td><strong>Concept drift</strong></td><td>the relationship between inputs and the outcome changes (customers behave differently, fraudsters adapt)</td><td>even with the same inputs, the old rules are now wrong</td></tr>
+<tr><td><strong>Model performance</strong></td><td>accuracy, recall, error, once the true outcomes are known</td><td>the real report card; often arrives with a delay (a loan default takes months)</td></tr>
+<tr><td><strong>Business impact</strong></td><td>revenue, complaints, savings</td><td>the reason the model exists</td></tr>
+</table></div>
+<h3>Measuring drift: the population stability index (PSI)</h3>
+<p>You usually cannot compute accuracy today, because the true labels are not yet known. What you can compute today is whether the <em>inputs</em> look like the training inputs. A popular score is the <strong>PSI</strong>: split a feature into bins, compare the share of data in each bin then (reference) and now (live), and add up (live share − reference share) × ln(live share ÷ reference share) over the bins.</p>
+<div class="callout math"><p><strong>By hand.</strong> Five bins of, say, customer age. Reference shares (training data): 10%, 20%, 40%, 20%, 10%. Live shares this week: 5%, 15%, 35%, 25%, 20%.</p>
+<div class="tw"><table>
+<tr><th>Bin</th><th class="num">Reference</th><th class="num">Live</th><th class="num">(live − ref) × ln(live ÷ ref)</th></tr>
+<tr><td>1</td><td class="num">0.10</td><td class="num">0.05</td><td class="num">(−0.05) × ln 0.5 = 0.0347</td></tr>
+<tr><td>2</td><td class="num">0.20</td><td class="num">0.15</td><td class="num">(−0.05) × ln 0.75 = 0.0144</td></tr>
+<tr><td>3</td><td class="num">0.40</td><td class="num">0.35</td><td class="num">(−0.05) × ln 0.875 = 0.0067</td></tr>
+<tr><td>4</td><td class="num">0.20</td><td class="num">0.25</td><td class="num">(+0.05) × ln 1.25 = 0.0112</td></tr>
+<tr><td>5</td><td class="num">0.10</td><td class="num">0.20</td><td class="num">(+0.10) × ln 2 = 0.0693</td></tr>
+<tr><th colspan="3">PSI = total</th><td class="num"><b>0.136</b></td></tr>
+</table></div>
+<p>A common rule of thumb: PSI below <b>0.1</b> = stable; <b>0.1 to 0.25</b> = moderate change, watch closely; above <b>0.25</b> = significant change, investigate. Here 0.136 says "moderate": the population is getting older. (These thresholds are conventions, not laws.)</p></div>
+<p>Another tool is a statistical test comparing the two samples, such as the <strong>Kolmogorov–Smirnov (KS) test</strong>, which reports the largest gap between the two cumulative distributions and a p-value. A caution from a run with 2,000 samples each (standard normal versus a shifted normal): a shift of 0.1 gave D = 0.061 and p = 0.001, a shift of 0.3 gave D = 0.144 (p ≈ 10<sup>−18</sup>), 0.6 gave D = 0.244. With large samples even tiny, harmless shifts become "statistically significant", so look at the <em>size</em> of the drift (D or PSI) and not only the p-value.</p>
+<p>The demo below plays both roles: the orange histogram is production data drifting away from the training data (blue). The curves show that as the shift grows, the drift score rises (something you can measure today) while the model's accuracy, which you would not see immediately, falls:</p>
+<div class="demo" data-title="Watching the data drift" id="demo-drift">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>Improving: when to retrain</h3>
+<ul>
+<li><strong>On a schedule</strong> (weekly, monthly) when the world changes steadily and you have new labelled data.</li>
+<li><strong>On a trigger</strong> (drift alarm, performance below a threshold).</li>
+<li><strong>Champion / challenger:</strong> train a new model, compare it with the current one on recent data (and in shadow mode), and only replace the champion if the challenger is clearly better.</li>
+<li>Beware <strong>feedback loops</strong>: if the model's decisions change the data it learns from (it only shows users what it predicts they like, then trains on their clicks), it can reinforce its own biases. Keep some exploration or random holdout.</li>
+</ul>
+
+<h2>9. Safety, privacy and responsibility</h2>
+<ul>
+<li><strong>Protect the service:</strong> authentication, rate limits, input size limits, no internal error details in responses.</li>
+<li><strong>Protect the data:</strong> log only what you need; remove or hash personal information; follow the privacy laws that apply to you.</li>
+<li><strong>Check fairness:</strong> measure performance on subgroups (see the Evaluation Metrics lesson); an overall average can hide harm to a group.</li>
+<li><strong>Be transparent:</strong> document what the model is for and not for (a "model card"), its known weaknesses, and its training data.</li>
+<li><strong>Keep a human in the loop</strong> for high-stakes or low-confidence decisions, and give people a way to contest a decision.</li>
+</ul>
+<p>Use this checklist to test yourself. Starred items are the ones I would refuse to ship without:</p>
+<div class="demo" data-title="Am I ready to deploy?" id="demo-check">
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>10. Common ways deployments fail</h2>
+<div class="tw"><table>
+<tr><th>Failure</th><th>Cause</th><th>Prevention</th></tr>
+<tr><td>Training–serving skew</td><td>preprocessing differs between training and production</td><td>save one pipeline; test the service with known examples</td></tr>
+<tr><td>Silent bad inputs</td><td>an upstream system changes a unit, a column, or starts sending nulls</td><td>schema validation, data-quality monitoring</td></tr>
+<tr><td>Model decays</td><td>the world drifts</td><td>drift and performance monitoring, retraining plan</td></tr>
+<tr><td>Wrong environment</td><td>different library versions</td><td>pinned requirements or containers</td></tr>
+<tr><td>Too slow or too costly</td><td>model too large, loaded per request, no batching</td><td>load once, batch requests, compress or simplify the model, measure early</td></tr>
+<tr><td>No way back</td><td>old version deleted; new model worse</td><td>versioning and rollback</td></tr>
+<tr><td>Overconfident nonsense</td><td>inputs far outside training data</td><td>range checks, out-of-distribution flags, fallbacks</td></tr>
+</table></div>
+
+<h2>11. Real-world use</h2>
+<div class="cards">
+<div class="card"><h4>💳 Payments</h4><p>A fraud model answers within milliseconds on every card transaction, is monitored for drift as fraud tactics change, and is retrained often.</p></div>
+<div class="card"><h4>🎬 Recommendations</h4><p>Streaming services score huge catalogues in batch overnight and re-rank a short list in real time when you open the app.</p></div>
+<div class="card"><h4>📱 On your phone</h4><p>Keyboard suggestions and face unlock run on the device: fast, private and offline.</p></div>
+<div class="card"><h4>🏭 Predictive maintenance</h4><p>Sensor data streams to a model that flags machines likely to fail; alerts go to engineers, who can override it.</p></div>
+<div class="card"><h4>🏥 Clinical tools</h4><p>Decision-support models run behind hospital systems with strict validation, audit logs and a clinician always in charge.</p></div>
+<div class="card"><h4>📊 Analyst dashboards</h4><p>A small interactive app (built with tools like Streamlit, next lesson) lets a business team explore predictions without writing code.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Deployment is a <strong>cycle</strong>: package → serve → release safely → monitor → retrain. The model is only one piece.</li>
+<li>Choose the <strong>pattern</strong> from when the answer is needed: batch, real-time API, streaming, edge, or an interactive app. Models are far faster per row on batches (0.42 ms for one row vs 0.73 ms for 4,500 in my test).</li>
+<li><strong>Save the whole pipeline</strong> (preprocessing + model) with joblib, record versions, and <strong>never load untrusted pickles</strong>; consider skops or ONNX.</li>
+<li>Serve behind an <strong>API</strong> (FastAPI or Flask): load the model once, <strong>validate every input</strong>, return structured answers and clear error codes. Validation does not stop a model being confidently wrong far from its training data: add range and out-of-distribution checks.</li>
+<li>Package with <strong>pinned requirements or a container</strong>; release with <strong>shadow, canary or A/B</strong> stages and keep a <strong>rollback</strong>.</li>
+<li><strong>Monitor</strong> health, data quality, <strong>drift</strong> (for example PSI: 0.136 in our example = moderate), performance when labels arrive, and business impact; retrain on a schedule or trigger, with a champion/challenger comparison.</li>
+<li>Take <strong>security, privacy, fairness and human oversight</strong> seriously from the start.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A feature had reference shares 50% / 50% in two bins and live shares 30% / 70%. Compute the PSI. Is that stable, moderate or significant drift?</li>
+<li>Why is it better to save a whole <code>Pipeline</code> than only the trained model?</li>
+<li>Choose batch, real-time API or edge for: (a) a nightly customer-churn list for the marketing team, (b) approving a card payment, (c) a phone keyboard's next-word suggestion.</li>
+<li>Why is loading a pickle file from an unknown website dangerous?</li>
+<li>Bonus: run the FastAPI example (or read it carefully). What response do you get if you send <code>sepal_length = 100</code>? What if you send <code>petal_length = 19</code>, and why is the second case more worrying?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> (0.30 − 0.50) × ln(0.30 ÷ 0.50) + (0.70 − 0.50) × ln(0.70 ÷ 0.50) = (−0.20) × (−0.511) + (0.20) × (0.336) = 0.102 + 0.067 = <b>0.17</b>: <b>moderate</b> drift (between 0.1 and 0.25): watch it closely.</p>
+<p><b>2.</b> The pipeline carries the exact preprocessing that was fitted on the training data (scaler averages, encoder categories, imputation values). Saving only the model means someone must re-create the preprocessing by hand in production, which is the classic source of training–serving skew.</p>
+<p><b>3.</b> (a) <b>Batch</b> (a scheduled job, freshness of a day is fine). (b) <b>Real-time API</b> (must answer within milliseconds during the transaction). (c) <b>Edge / on-device</b> (fast, private and works offline).</p>
+<p><b>4.</b> Unpickling can execute arbitrary code stored in the file, so a malicious model file can take over your computer or server as soon as you load it. Only load pickles from sources you trust; use safer formats where possible.</p>
+<p><b>5.</b> <code>sepal_length = 100</code> is rejected by the schema (limit 20): HTTP <b>422</b>, "Input should be less than 20". <code>petal_length = 19</code> passes validation and the model answers with a very confident class (my test of the same idea gave 100% virginica). The second case is more worrying because the error is <em>silent</em>: the service reports success and a confident number for an input the model cannot possibly understand.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/deployment.js"></script>
+</body>
+</html>

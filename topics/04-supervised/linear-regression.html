@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linear Regression · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="linreg">
+<article id="lesson">
+
+<h1>Linear Regression</h1>
+<p class="lede">Linear Regression is a supervised ML algorithm that learns the relationship between dependent and independent (input and output) data in order to predict a continuous numerical value, by using a straight line, the best fit line.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 90 min</span><span class="chip plain">8 interactive demos</span></div>
+
+<h2>1. The idea in one picture</h2>
+<p>The name has two halves, and each one tells you something:</p>
+<ul>
+<li><strong>Linear</strong> → a <em>straight line</em>. The model assumes the output changes by a constant amount for every step in the input.</li>
+<li><strong>Regression</strong> → predicting a <em>continuous numerical value</em> (a price, a temperature, a salary), as opposed to a category.</li>
+</ul>
+<div class="callout analogy"><p><strong>The taxi fare.</strong> A taxi charges a fixed <em>booking fee</em> (₹50) plus <em>₹12 for every kilometre</em>. So fare = 50 + 12 × km. The booking fee is what you pay when you have travelled 0 km, which is the <strong>intercept</strong>. The ₹12 is how much the fare grows per extra km, which is the <strong>slope</strong>. Linear regression is the process of <em>discovering</em> that 50 and that 12 just by looking at a list of past trips (distance, fare). Once you have them you can quote a fare for a trip nobody has taken yet.</p></div>
+<p>In real data the points are never perfectly on a line (traffic, tolls, waiting time add noise), so the goal is the line that is <strong>closest to all the points overall</strong>: the <strong>best fit line</strong>.</p>
+
+<h2>2. The straight-line equation and its ML names</h2>
+<p>The generic straight-line equation you know from school is <code>y = mx + c</code>. It is used everywhere in maths, but in the Linear Regression algorithm we need <em>specific terminology</em>, so we use the <strong>same formula with different names</strong>:</p>
+$$h_\theta(x_i)=\theta_0+\theta_1\,x_i$$
+<p><strong>In words:</strong> prediction = intercept + slope × input.</p>
+<div class="tw"><table>
+<tr><th>Symbol</th><th>Meaning</th><th>School name</th><th>Taxi example</th></tr>
+<tr><td>\(h_\theta(x_i)\)</td><td><strong>Prediction</strong> (the model's guess for sample i)</td><td>y</td><td>Predicted fare</td></tr>
+<tr><td>\(x_i\)</td><td><strong>Input</strong> (feature)</td><td>x</td><td>Kilometres</td></tr>
+<tr><td>\(\theta_0\)</td><td><strong>Intercept</strong></td><td>c</td><td>Booking fee ₹50</td></tr>
+<tr><td>\(\theta_1\)</td><td><strong>Slope</strong></td><td>m</td><td>₹12 per km</td></tr>
+</table></div>
+<p><strong>Intercept:</strong> the value of y when x is 0. It is where the line crosses the vertical axis. <strong>Slope:</strong> the unit movement of change on the y-axis caused by a change on the x-axis. It tells us <em>how fast the output changes with respect to the change in input</em>. If x goes up by 1, the prediction goes up by θ₁.</p>
+<div class="demo" data-title="Slope and intercept: move the two knobs" id="demo-si">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The two numbers θ₀ and θ₁ are the <strong>parameters</strong> of the model. "Training" a linear regression means finding the best values for them.</p>
+
+<h2>3. Which line? Infinitely many lines fit a scatter</h2>
+<p>For any given regression dataset plotted on a graph we have <em>n</em> possible straight lines (L1, L2, L3, …). Among those we have to find the <strong>best line</strong>, the one which covers most of the data points and has the <em>least difference between the line and the data points</em>. To measure "difference" and search for the best line, we use a <strong>cost function</strong>.</p>
+<p>Below, you are the learning algorithm. Adjust θ₀ and θ₁ to make the line hug the points. The dashed red segments are the <strong>errors</strong> (residuals): the gap between each real value and the line's prediction. The coloured number is the cost J, which you want to make as small as possible.</p>
+<div class="demo" data-title="Be the algorithm: fit the line by hand" id="demo-fit">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Click on the plot to add your own points. Try <strong>Add an outlier</strong> and notice how a single strange point drags the best line towards it: squared errors punish big misses heavily, which is why outliers matter in linear regression.</p>
+
+<h2>4. The cost function: measuring "how wrong"</h2>
+<p>The <strong>cost function</strong> is the error found between the actual value and the predicted value. It is used to find the best fit line. (It is also called the loss function; the specific one used here is the <em>Mean Squared Error</em> / least squares.)</p>
+$$J(\theta_0,\theta_1)=\frac{1}{2n}\sum_{i=1}^{n}\big(h_\theta(x_i)-y_i\big)^2$$
+<p><strong>In words:</strong> for every data point take (prediction − actual), square it, add them all up, and divide by 2n. That is simply <em>the average squared mistake</em> (with a harmless extra ½).</p>
+<div class="tw"><table>
+<tr><th>Piece</th><th>Why it is there</th></tr>
+<tr><td>\(J(\theta_0,\theta_1)\)</td><td>The <strong>error</strong> (cost) for one particular choice of the two parameters.</td></tr>
+<tr><td>\(\frac1n\)</td><td>Takes the <strong>average</strong> so the cost does not just grow because we have more data.</td></tr>
+<tr><td>the extra \(\frac12\)</td><td>For <strong>simplification</strong>: when we differentiate the square later, the 2 cancels, giving a tidier gradient.</td></tr>
+<tr><td>\(\sum\)</td><td>Adds up the error of <strong>all</strong> the data points.</td></tr>
+<tr><td>\(h_\theta(x_i)-y_i\)</td><td>The <strong>difference</strong> between prediction and actual value.</td></tr>
+<tr><td>\(y_i\)</td><td>The actual value.</td></tr>
+<tr><td>\((\cdot)^2\)</td><td>Squared to <strong>avoid negative values</strong> (so over- and under-predictions can't cancel out) and to punish large errors more.</td></tr>
+</table></div>
+<p>How to read the number:</p>
+<div class="tw"><table>
+<tr><th>Error J(θ₀,θ₁)</th><th>Model type</th></tr>
+<tr><td>High (e.g. 1000)</td><td>Bad model</td></tr>
+<tr><td>Lower</td><td>Good model</td></tr>
+<tr><td>0</td><td>Perfect model (every point exactly on the line)</td></tr>
+</table></div>
+<p>θ₀ and θ₁ are the <strong>main parameters</strong>: the model changes their values, again and again, to reduce J and so improve its accuracy.</p>
+
+<h3>A tiny example, by hand</h3>
+<p>Let the data be three points where the output equals the input: x = 1, 2, 3 and y = 1, 2, 3. To keep it simple we fix θ₀ = 0 and try several values of θ₁, recalculating the error each time. Move the slider (or use the preset buttons) and follow every number in the table.</p>
+<div class="demo" data-title="Cost function by hand: x = 1, 2, 3 and y = 1, 2, 3" id="demo-cost">
+  <div class="db" data-canvas></div>
+  <div class="db"><div class="tw"><table id="costTbl"></table></div></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math">
+<p>For θ₀ = 0 and θ₁ = 0 every prediction is 0: errors (h − y) = −1, −2, −3; squares = 1, 4, 9; sum = 14; \(J=\frac{14}{2\cdot3}=\mathbf{2.33}\).</p>
+<p>For θ₁ = 0.5: predictions 0.5, 1, 1.5; errors −0.5, −1, −1.5; squares 0.25, 1, 2.25; sum 3.5; \(J=\frac{3.5}{6}=\mathbf{0.58}\).</p>
+<p>For θ₁ = 1: predictions 1, 2, 3 match exactly; sum 0; \(J=\mathbf{0}\).</p>
+<p>For θ₁ = 1.5 and θ₁ = 2 the errors are +0.5, +1, +1.5 (J = 0.58) and +1, +2, +3 (J = 2.33). So the table of cost values is symmetric:</p>
+<div class="tw"><table>
+<tr><th>θ₀</th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><th>θ₁</th><td class="num">0</td><td class="num">0.5</td><td class="num">1</td><td class="num">1.5</td><td class="num">2</td></tr>
+<tr><th>Error J</th><td class="num">2.33</td><td class="num">0.58</td><td class="num"><b>0</b></td><td class="num">0.58</td><td class="num">2.33</td></tr>
+</table></div>
+<p>(Rounded, this is the "2.3, 0.5, 0, 0.5, 2.3" sequence in the classroom notes.)</p></div>
+<p>By using these values the model creates a graph, a curve shaped like a bowl. That curve is called the <strong>Gradient Descent Curve</strong>.</p>
+
+<h2>5. Gradient descent: walking down the bowl</h2>
+<p>The <strong>Gradient Descent Curve</strong> is the cost function graph that shows how the error changes with respect to the model parameters (θ₀, θ₁). With one parameter it is a U-shape: high on both sides and lowest at the bottom, where θ₁ = 1 in our example.</p>
+<div class="callout analogy"><p><strong>The blindfolded hiker.</strong> You stand somewhere on a hillside in thick fog and want the lowest point of the valley. You can't see it, but you can feel which way the ground tilts under your feet. So you take a small step downhill, feel again, step again. The steepness is the <strong>gradient</strong>; the size of each step is the <strong>learning rate α</strong>. Steep ground means big adjustments; near the bottom the ground flattens and the steps naturally shrink.</p></div>
+<div class="callout math">
+<p><strong>The rule in plain words.</strong> Repeat: (1) compute every prediction and its error (prediction − actual); (2) nudge the parameters against the error:</p>
+<ul>
+<li>new θ₀ = old θ₀ − α × <em>(average of the errors)</em></li>
+<li>new θ₁ = old θ₁ − α × <em>(average of error × x)</em></li>
+</ul>
+<p>Update <em>both</em> at the same time and stop when J stops shrinking. (Those two averages are the slopes of the bowl, which is all "gradient" means. The extra ½ in J is what keeps them this tidy.)</p>
+<p><em>Step 1 on our data</em> (start θ₀ = 0, θ₁ = 0, α = 0.1): errors = −1, −2, −3.
+<br>average error = (−1 − 2 − 3) ÷ 3 = <strong>−2</strong>.
+<br>average of error × x = (−1·1 − 2·2 − 3·3) ÷ 3 = −14 ÷ 3 = <strong>−4.67</strong>.
+<br>θ₀ = 0 − 0.1 × (−2) = <strong>0.2</strong>; θ₁ = 0 − 0.1 × (−4.67) = <strong>0.467</strong>. The line has already tilted much closer to the data.
+<br><em>Step 2:</em> predictions 0.2 + 0.467 × (1, 2, 3) = 0.667, 1.133, 1.6; errors −0.333, −0.867, −1.4, and so on. After many steps the parameters settle at θ₀ = 0, θ₁ = 1.</p></div>
+<p>First, the one-parameter version. Keep θ₀ = 0 and slide down the U-curve. Notice the update rule for this data simplifies to θ₁ ← θ₁ − α · 4.67 · (θ₁ − 1).</p>
+<div class="demo" data-title="Roll the ball down the cost curve (learning rate)" id="demo-gd1">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout warn"><p><strong>Choosing α.</strong> Too small: it crawls (thousands of steps). Just right: smooth and quick. Too big: each step overshoots the bottom and lands higher on the opposite wall, so the error <em>grows</em> and the algorithm diverges. For the data above, α above about 0.43 diverges (because |1 − α·4.67| must stay below 1). Try α = 0.5 in the demo.</p></div>
+
+<h3>With two parameters: a 3-D bowl</h3>
+<p>In real life we must consider <strong>all the parameters and the error together</strong>, so the graph becomes a 3-D surface: θ₀ and θ₁ on the floor, the error J as the height. Its lowest point is the <strong>global minimum</strong>, the best possible pair (θ₀, θ₁). A 3-D bowl is hard to draw on a flat screen, so below we look down from above: the colours show the height (yellow = low, purple = high), and the bands are contour lines like on a hiking map.</p>
+<div class="demo" data-title="Gradient descent on the 3-D bowl (top view): click to choose a start point" id="demo-contour">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Two things to try: (1) press <strong>Standardize x</strong>. The narrow tilted valley becomes a round bowl and the path goes straight to the bottom in far fewer steps. This is exactly why feature scaling (previous lesson) speeds up gradient descent. (2) Click at different starting points: gradient descent reaches the same bottom from anywhere, because the linear-regression bowl has <em>only one</em> minimum (it is a convex function).</p>
+
+<h2>6. The global minimum point and making predictions</h2>
+<p>The <strong>global minimum point</strong> is the point on the gradient descent curve where it attains its <em>absolute lowest value</em>. It gives us the best values for the parameters.</p>
+<p>For our example curve the best θ₀ is <strong>0</strong> and the best θ₁ is <strong>1</strong>. These are the values we plug into the straight-line equation:</p>
+$$h_\theta(x_i)=\theta_0+\theta_1x_i=0+1\cdot x_i=1\cdot x_i$$
+<p>Now the model is trained. If we give it a <em>new value</em>, it uses this equation to produce the output. For example, x = 5:</p>
+$$h_\theta(5)=1\times5=\mathbf{5}$$
+<p>This step, using the learned equation on new data, is called <strong>inference</strong> or prediction.</p>
+
+<h2>7. A faster way: the closed-form (normal equation) solution</h2>
+<p>For a straight line there is also a direct formula, so we don't strictly need to walk downhill. It gives exactly the bottom of the bowl:</p>
+$$\theta_1=\frac{\sum_i (x_i-\bar x)(y_i-\bar y)}{\sum_i (x_i-\bar x)^2},\qquad \theta_0=\bar y-\theta_1\,\bar x$$
+<p><strong>In words:</strong> slope = (how much x and y move together) ÷ (how spread out x is); intercept = average y − slope × average x. The table below does exactly that, column by column.</p>
+<div class="callout math">
+<p><strong>Worked example.</strong> Data: (1, 2), (2, 4), (3, 5), (4, 8). Means: \(\bar x=2.5\), \(\bar y=4.75\).</p>
+<div class="tw"><table>
+<tr><th class="num">x</th><th class="num">y</th><th class="num">x − x̄</th><th class="num">y − ȳ</th><th class="num">(x−x̄)(y−ȳ)</th><th class="num">(x−x̄)²</th></tr>
+<tr><td class="num">1</td><td class="num">2</td><td class="num">−1.5</td><td class="num">−2.75</td><td class="num">4.125</td><td class="num">2.25</td></tr>
+<tr><td class="num">2</td><td class="num">4</td><td class="num">−0.5</td><td class="num">−0.75</td><td class="num">0.375</td><td class="num">0.25</td></tr>
+<tr><td class="num">3</td><td class="num">5</td><td class="num">0.5</td><td class="num">0.25</td><td class="num">0.125</td><td class="num">0.25</td></tr>
+<tr><td class="num">4</td><td class="num">8</td><td class="num">1.5</td><td class="num">3.25</td><td class="num">4.875</td><td class="num">2.25</td></tr>
+<tr><th colspan="4">Sum</th><th class="num">9.5</th><th class="num">5</th></tr>
+</table></div>
+<p>θ₁ = 9.5 / 5 = <strong>1.9</strong>; θ₀ = 4.75 − 1.9 × 2.5 = <strong>0</strong>. The line is ŷ = 1.9x. Predictions: 1.9, 3.8, 5.7, 7.6; errors (y − ŷ): 0.1, 0.2, −0.7, 0.4; squared errors: 0.01, 0.04, 0.49, 0.16 → sum 0.70; \(J=0.70/8=0.0875\). For a prediction at x = 5: ŷ = 9.5.</p>
+<p><strong>How good is it?</strong> The spread of y around its average is 7.5625 + 0.5625 + 0.0625 + 10.5625 = 18.75. The error left over after using our line is 0.70. So R² = 1 − 0.70 ÷ 18.75 = <strong>0.963</strong>: the line explains 96.3% of the variation in y.</p></div>
+<div class="tw"><table>
+<tr><th></th><th>Gradient descent</th><th>Normal equation (closed form)</th></tr>
+<tr><td>Idea</td><td>Iterate downhill</td><td>Solve directly</td></tr>
+<tr><td>Learning rate needed</td><td>Yes, choose α</td><td>No</td></tr>
+<tr><td>Feature scaling</td><td>Strongly recommended</td><td>Not needed</td></tr>
+<tr><td>Large data (millions of rows, many features)</td><td>Scales well (mini-batch / SGD)</td><td>Slow (matrix inversion)</td></tr>
+<tr><td>Used by</td><td><code>SGDRegressor</code>, neural networks</td><td><code>LinearRegression</code> (uses a stable variant of this)</td></tr>
+</table></div>
+
+<h2>8. More than one input: multiple linear regression</h2>
+<p>Real problems have many features: a house's price depends on area, bedrooms and age together. Same idea, more knobs:</p>
+$$h_\theta(x)=\theta_0+\theta_1x_1+\theta_2x_2+\dots+\theta_kx_k$$
+<p>Each θⱼ says <em>"how much does the prediction change when feature j increases by 1, keeping the others fixed"</em>. With two features the fitted model is a flat sheet (plane) in 3-D; with more, a hyperplane. Cost function and gradient descent are unchanged: you just have more partial derivatives. Try the prediction calculator; every feature contributes its own bar.</p>
+<div class="demo" data-title="Multiple regression: price = 20 + 0.11·area + 6·bedrooms − 1.3·age" id="demo-multi">
+  <div class="controls" data-controls></div>
+  <div class="db"><div id="multiBars"></div></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>9. Is the line trustworthy? Metrics and assumptions</h2>
+<p>Metrics (from the ML Workflow lesson): <strong>MAE</strong> (average miss), <strong>RMSE</strong> (typical miss, punishes big errors), and <strong>R²</strong> (share of the variation explained; 1 = perfect, 0 = no better than always predicting the mean). Always compute them on <em>test</em> data.</p>
+<p>Linear regression works best when these assumptions roughly hold (remember <strong>L-I-N-E</strong>):</p>
+<div class="tw"><table>
+<tr><th>Assumption</th><th>Meaning</th><th>How to check / fix</th></tr>
+<tr><td><strong>L</strong>inearity</td><td>The relationship really is (close to) a straight line</td><td>Scatter plot; residual plot shows no curve. Fix: add polynomial features, transform variables.</td></tr>
+<tr><td><strong>I</strong>ndependence</td><td>Rows don't influence each other</td><td>Be careful with time series (use time-series methods).</td></tr>
+<tr><td><strong>N</strong>ormal errors</td><td>Residuals roughly bell-shaped</td><td>Histogram / Q-Q plot of residuals (matters for confidence intervals more than for prediction).</td></tr>
+<tr><td><strong>E</strong>qual variance</td><td>Spread of errors is the same for all x (homoscedastic)</td><td>Residual plot should look like a random band, not a funnel.</td></tr>
+<tr><td>No multicollinearity</td><td>Features aren't near-copies of each other</td><td>Correlation matrix / VIF. Fix: drop one, or use Ridge/LASSO (next lessons).</td></tr>
+</table></div>
+<p>The <strong>residual plot</strong> (error vs. x) is the best quick check. If the model is adequate, the residuals look like random noise around zero. A visible pattern means the model is missing something.</p>
+<div class="demo" data-title="The residual plot exposes a bad model" id="demo-resid">
+  <div class="db"><div class="two-col" id="residCols"></div></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p>"Linear" refers to being linear in the <em>parameters</em>, not necessarily in x. The model \(\theta_0+\theta_1x+\theta_2x^2\) is still linear regression: you simply create the extra feature x². That is how you fit curves with the same machinery (<code>PolynomialFeatures</code>).</p></div>
+
+<h2>10. Pitfalls to remember</h2>
+<ul>
+<li><strong>Outliers</strong> pull the line strongly (squared error). Detect and handle them (or use a robust loss such as Huber).</li>
+<li><strong>Extrapolation.</strong> Predicting far outside the range of the training x is risky: a line that fits houses of 500–3000 sq ft says nothing reliable about a 30,000 sq ft palace.</li>
+<li><strong>Multicollinearity.</strong> Features that duplicate each other make individual coefficients unstable and hard to interpret.</li>
+<li><strong>Scaling.</strong> Needed for gradient descent and for comparing coefficient sizes; not needed for the plain closed-form solution.</li>
+<li><strong>Correlation ≠ causation.</strong> A slope tells you about association in this data, not that changing x will change y.</li>
+<li><strong>Categorical inputs</strong> must be encoded first (one-hot, previous lesson).</li>
+</ul>
+
+<h2>11. Linear regression in scikit-learn</h2>
+<pre class="code">
+from sklearn.linear_model import LinearRegression
+
+X = [[1], [2], [3], [4]]        # features: 2-D  (n_samples, n_features)
+y = [2, 4, 5, 8]                # target:   1-D
+
+model = LinearRegression()      # 1. create
+model.fit(X, y)                 # 2. train: finds theta_0 and theta_1
+
+print(model.intercept_)         # ~0.0   (theta_0)
+print(model.coef_)              # [1.9]  (theta_1)
+print(model.predict([[5]]))     # [9.5]
+print(model.score(X, y))        # 0.9627 (R squared)
+</pre>
+<p>These match our hand calculation: θ₀ = 0, θ₁ = 1.9, R² = 0.963. Now a realistic end-to-end version with a train/test split, scaling and evaluation:</p>
+<pre class="code">
+from sklearn.datasets import fetch_california_housing
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+X, y = fetch_california_housing(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = make_pipeline(StandardScaler(), LinearRegression())
+model.fit(X_train, y_train)
+pred = model.predict(X_test)
+
+print("MAE :", mean_absolute_error(y_test, pred))
+print("RMSE:", mean_squared_error(y_test, pred) ** 0.5)
+print("R2  :", r2_score(y_test, pred))
+
+lin = model.named_steps["linearregression"]
+print(lin.intercept_, lin.coef_)     # which features push the price up or down?
+</pre>
+<div class="tw"><table>
+<tr><th>Attribute / method</th><th>Meaning</th></tr>
+<tr><td><code>fit(X, y)</code></td><td>Learn θ (uses a numerically stable least-squares solver, not gradient descent)</td></tr>
+<tr><td><code>intercept_</code></td><td>θ₀</td></tr>
+<tr><td><code>coef_</code></td><td>θ₁ … θₖ, one per feature</td></tr>
+<tr><td><code>predict(X)</code></td><td>Apply the equation to new rows</td></tr>
+<tr><td><code>score(X, y)</code></td><td>R² on the data you give it</td></tr>
+<tr><td><code>fit_intercept=True</code></td><td>Whether to learn θ₀ (default yes)</td></tr>
+</table></div>
+<p>For huge datasets, or if you want to <em>see</em> gradient descent, use <code>SGDRegressor(learning_rate="constant", eta0=0.01)</code> (always scale first). To fit curves: <code>make_pipeline(PolynomialFeatures(2), LinearRegression())</code>.</p>
+
+<h2>12. Linear regression in the real world</h2>
+<div class="cards">
+<div class="card"><h4>🏠 House pricing</h4><p>Area, bedrooms, age, location → price. Agents use the coefficients to explain "each extra bedroom adds about ₹X".</p></div>
+<div class="card"><h4>📈 Sales & demand forecasting</h4><p>Ad spend, price, season → units sold. Marketing teams use the slope as "return per extra rupee of advertising".</p></div>
+<div class="card"><h4>💼 Salary estimation</h4><p>Years of experience, education, city → salary. HR benchmarks and offer calculators.</p></div>
+<div class="card"><h4>⚡ Energy consumption</h4><p>Temperature, hour, occupancy → electricity demand for grid planning.</p></div>
+<div class="card"><h4>🏥 Health & insurance</h4><p>Age, BMI, smoking → medical cost; the basis for premium models.</p></div>
+<div class="card"><h4>🌾 Agriculture</h4><p>Rainfall, fertiliser, temperature → crop yield.</p></div>
+<div class="card"><h4>🔬 Science & finance</h4><p>Calibrating instruments, estimating a stock's beta (its slope against the market), trend lines.</p></div>
+<div class="card"><h4>🧱 A baseline for everything</h4><p>Even when the final model is a random forest, teams start with linear regression: it is fast, interpretable and shows if complexity helps.</p></div>
+</div>
+<p><strong>Why it is still popular:</strong> it trains in milliseconds, needs little data, and its coefficients are easy to explain to a non-technical person. <strong>Limitations:</strong> it cannot capture complex non-linear patterns or interactions on its own. That is what later lessons (Decision Trees, Random Forest, Gradient Boosting) address. And Ridge/LASSO (next) add protection against overfitting and multicollinearity.</p>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Linear regression fits a straight line \(h_\theta(x)=\theta_0+\theta_1x\) to predict a continuous number; θ₀ = intercept, θ₁ = slope.</li>
+<li>The <strong>cost function</strong> \(J=\frac1{2n}\sum(h-y)^2\) measures how wrong a line is; J = 0 is perfect.</li>
+<li><strong>Gradient descent</strong> updates θ by stepping against the slope of J with learning rate α until it reaches the <strong>global minimum</strong> (a single bottom, since the bowl is convex).</li>
+<li>At the minimum you take the best θ (in our example 0 and 1), and prediction is just plugging x in: h(5) = 5.</li>
+<li>A closed-form solution exists; scikit-learn's <code>LinearRegression</code> uses it.</li>
+<li>Check R² and the residual plot; watch out for outliers, extrapolation and correlated features.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>By hand, compute θ₀ and θ₁ for the data (1, 3), (2, 5), (3, 7), (4, 9). What do you notice about the errors, and what does h(10) equal?</li>
+<li>Using the update rule with α = 0.05, do <em>two</em> gradient descent steps starting from θ₀ = 0, θ₁ = 0 on the data (1,1), (2,2), (3,3). (Use: change in θ₀ = average error; change in θ₁ = average of error × x.)</li>
+<li>Confirm the first result in scikit-learn with <code>LinearRegression</code>, and try predicting x = 10.</li>
+<li>Bonus: load the California housing data, fit the pipeline above, and print which feature has the largest positive coefficient.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> The points lie exactly on y = 2x + 1, so θ₀ = 1, θ₁ = 2, all errors are 0 (J = 0), and h(10) = 21.</p>
+<p><b>2.</b> Step 1: gradients −2 and −4.667 → θ₀ = 0.1, θ₁ = 0.2333. Step 2: predictions 0.3333, 0.5667, 0.8; errors −0.6667, −1.4333, −2.2; mean error = −1.4333; mean(error × x) = (−0.6667 − 2.8667 − 6.6)/3 = −3.3778 → θ₀ = 0.1 + 0.0717 = 0.1717, θ₁ = 0.2333 + 0.1689 = 0.4022.</p>
+<p><b>3.</b> <code>LinearRegression().fit([[1],[2],[3],[4]],[3,5,7,9]).predict([[10]])</code> → [21.].</p>
+<p><b>4.</b> Typically <code>MedInc</code> (median income) has the largest positive coefficient.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/linear-regression.js"></script>
+</body>
+</html>

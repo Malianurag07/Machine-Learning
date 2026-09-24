@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDA · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="lda">
+<article id="lesson">
+
+<h1>Linear Discriminant Analysis (LDA)</h1>
+<p class="lede">PCA looks for the direction where the data varies the <em>most</em>. LDA looks for the direction where the <em>classes are best separated</em>. It uses the labels to squeeze many columns into a few, keeping exactly the information that tells the classes apart. It is also a simple, fast classifier in its own right.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 85 min</span><span class="chip plain">3 interactive demos</span></div>
+<div class="callout tip"><p><strong>Where does it belong?</strong> LDA sits next to PCA in most courses (this syllabus lists it in the same block) because both reduce dimensions. But unlike PCA and clustering it is <strong>supervised</strong>: it needs a class label for every training row.</p></div>
+
+<h2>1. The big idea: look from where the classes separate</h2>
+<div class="callout analogy"><p><strong>Two singers, one microphone.</strong> Two people are singing in a room and you can place a single microphone anywhere. If you put it where the <em>loudest overall sound</em> comes from (PCA's idea), you might capture a blend of both voices. What you want is the position where the two voices are <em>easiest to tell apart</em>, which may be a quiet spot where one voice dominates on each side. LDA finds that position. PCA answers "where is there the most going on?", LDA answers "where do the groups differ the most, compared with how much each group wanders on its own?"</p></div>
+<p>Here is the situation where the two goals disagree. Two classes form parallel elongated clouds, shifted slightly <em>across</em> their long direction. The direction of greatest spread is <em>along</em> the clouds, where the two classes overlap completely. The useful direction is <em>across</em> them.</p>
+<div class="demo" data-title="Which axis separates the classes?" id="demo-project">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Rotate the axis by hand. The coloured histograms show how the two classes look when every point is projected onto the axis (a 1-D view): where they overlap heavily you cannot tell them apart. The score J at the bottom right measures the separation; its peak is the LDA direction, while PCA's direction sits in a valley.</p>
+
+<h2>2. The criterion: far apart, but tight inside</h2>
+<p>For a direction, project every point onto it and look at the two classes as 1-D clouds. A good direction has two properties at once:</p>
+<ul>
+<li>the class <strong>averages</strong> are <em>far apart</em> (large "between-class" gap), and</li>
+<li>each class is <strong>tightly bunched</strong> around its own average (small "within-class" spread).</li>
+</ul>
+<p>Fisher's criterion combines both into one score:</p>
+<p style="text-align:center"><b>J = (gap between the two class averages)² ÷ (spread of class 1 + spread of class 2)</b></p>
+<p>where "spread" is the sum of squared distances from each point to its class average. LDA picks the direction with the largest J. For two classes there is a closed-form answer, worked out below.</p>
+
+<h3>By hand: two classes, five points each</h3>
+<div class="tw"><table>
+<tr><th>Class A</th><td>(0, 2)</td><td>(1, 4)</td><td>(2, 3)</td><td>(3, 6)</td><td>(4, 5)</td></tr>
+<tr><th>Class B</th><td>(2, 0)</td><td>(3, 2)</td><td>(4, 1)</td><td>(5, 4)</td><td>(6, 3)</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>1. Class averages.</strong> A: (2, 4). B: (4, 2). The difference B − A is Δ = (2, −2).</p>
+<p><strong>2. Within-class scatter matrix.</strong> For each class, sum the products of the deviations from that class's average. Class A's deviations are (−2, −2), (−1, 0), (0, −1), (1, 2), (2, 1): the sums give xx = 4 + 1 + 0 + 1 + 4 = 10, yy = 10, xy = 4 + 0 + 0 + 2 + 2 = 8, so <b>[[10, 8], [8, 10]]</b>. Class B has the same deviations, so the pooled within-class scatter is <b>S<sub>w</sub> = [[20, 16], [16, 20]]</b>. Both clouds are long diagonal streaks (the x and y values rise together).</p>
+<p><strong>3. Fisher's direction</strong> is <b>w = S<sub>w</sub><sup>−1</sup> × Δ</b>. In words: take the direction between the class averages, and then "un-stretch" it by the shape of the clouds, so we do not favour directions along which the clouds are naturally long. The determinant of S<sub>w</sub> is 20 × 20 − 16 × 16 = 144, and the inverse is (1 ÷ 144) × [[20, −16], [−16, 20]]. Then w = (1 ÷ 144) × (20 × 2 + (−16) × (−2), −16 × 2 + 20 × (−2)) = (1 ÷ 144) × (72, −72) = <b>(0.5, −0.5)</b>. That points along <b>(1, −1)</b>: <em>across</em> the diagonal streaks.</p>
+<p><strong>4. Project.</strong> Using the unit vector (1, −1) ÷ √2, the score of a point is (x − y) ÷ 1.414:</p>
+<div class="tw"><table>
+<tr><th>Class A</th><td class="num">−1.41</td><td class="num">−2.12</td><td class="num">−0.71</td><td class="num">−2.12</td><td class="num">−0.71</td></tr>
+<tr><th>Class B</th><td class="num">+1.41</td><td class="num">+0.71</td><td class="num">+2.12</td><td class="num">+0.71</td><td class="num">+2.12</td></tr>
+</table></div>
+<p>All of class A is below −0.7 and all of class B is above +0.7: <b>perfect separation</b> with a cut at 0. The projected averages are −1.41 and +1.41 (a gap of 2.83), and each class's spread is 0² + 0.71² + 0.71² + 0.71² + 0.71² = 2.0. So <b>J = 2.83² ÷ (2 + 2) = 8 ÷ 4 = 2.0</b>.</p>
+<p><strong>5. Compare with PCA.</strong> The total scatter of all ten points is S<sub>w</sub> + S<sub>b</sub> = [[20, 16], [16, 20]] + [[10, −10], [−10, 10]] = [[30, 6], [6, 30]], whose biggest axis is the diagonal (1, 1) (eigenvalue 36 versus 24 for (1, −1)). So PC1 = <b>(1, 1) ÷ √2</b>, the long direction of both streaks, and it explains 60% of the variance. Projecting onto PC1 gives class A the scores −2.83, −0.71, −0.71, 2.12, 2.12 and class B <em>exactly the same</em> five numbers: the classes are completely on top of each other and <b>J = 0</b>.</p></div>
+<p>PCA would happily keep the useless direction and throw away the one that matters. LDA does the opposite. A new point such as (5, 3) has score (5 − 3) ÷ 1.414 = +1.41: class B.</p>
+
+<h2>3. More than two classes</h2>
+<p>With C classes the same idea gives several directions. Two matrices describe the data:</p>
+<ul>
+<li><b>Within-class scatter S<sub>w</sub></b>: how spread out each class is around its own average, all classes added up (the "noise").</li>
+<li><b>Between-class scatter S<sub>b</sub></b>: how far the class averages are from the overall average, weighted by class size (the "signal").</li>
+</ul>
+<p>The LDA directions are the eigenvectors of <b>S<sub>w</sub><sup>−1</sup> S<sub>b</sub></b>, ordered by eigenvalue: the first direction has the best signal-to-noise ratio, the second is next best, and so on. Because C class averages can only span C − 1 dimensions, there are <b>at most C − 1 useful directions</b> (and never more than the number of features). Three iris species → at most 2 discriminants; ten digits → at most 9. (scikit-learn raises an error if you ask for more.) Each direction's eigenvalue, as a share of the total, is its <strong>explained variance ratio</strong>: on iris LDA gives <b>99.1%</b> to LD1 and 0.9% to LD2.</p>
+<p>Compare PCA and LDA on real data. The pictures show the first two components of each. On the wine data (3 grape varieties, 13 chemical measurements) try the "standardise" switch:</p>
+<div class="demo" data-title="PCA vs LDA on real data" id="demo-compare">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>LDA does not care about units.</strong> Rescaling a feature (from kilometres to metres, or standardising) rescales the within-class and between-class scatter in a matching way, so LDA's answer does not change (I checked: the correlation between the LDA scores on raw and standardised wine data is 1.0000). PCA <em>does</em> change (see the last lesson). This makes LDA convenient, but scaling is still useful if you follow it with a distance-based model such as KNN.</p></div>
+
+<h2>4. LDA as a classifier</h2>
+<p>LDA can also predict classes directly. It assumes:</p>
+<ol>
+<li>each class's points follow a <strong>bell-shaped (Gaussian)</strong> cloud, and</li>
+<li>all the classes share the <strong>same shape</strong> (the same covariance: same size, same tilt of the cloud), with only the centres different.</li>
+</ol>
+<p>Given those assumptions, Bayes' rule says: classify a new point into the class with the highest <em>(how well the point fits that class's cloud) × (how common that class is, its prior)</em>. Because the shapes are equal, the boundary between any two classes turns out to be a <strong>straight line</strong> (a flat plane in more dimensions), which is why it is called <em>linear</em> discriminant analysis. If the classes are allowed different shapes, the boundary curves and the method is called <strong>QDA</strong> (quadratic discriminant analysis).</p>
+<div class="demo" data-title="LDA vs QDA, and the effect of the prior" id="demo-boundary">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>With "same shape" data LDA's straight line is right, and QDA gains nothing.</li>
+<li>With "different shapes" data (one tight class inside a wider one), LDA's straight line struggles and QDA's curved boundary does better. In a scikit-learn experiment with 300 points per class (a similar setup) 5-fold accuracy was 0.567 for LDA and 0.707 for QDA.</li>
+<li>Move the <b>prior</b> of the orange class: the boundary shifts towards the less likely class, which is how you tell the model "orange is rare, so don't predict it without strong evidence". (By default scikit-learn takes the priors from the class frequencies in the training data.)</li>
+</ul>
+<p><strong>LDA vs logistic regression:</strong> both give linear boundaries. LDA is a bit more efficient when its Gaussian, equal-shape assumptions hold and the sample is small; logistic regression makes fewer assumptions and is more robust when they fail. It is often worth trying both.</p>
+<p><strong>Many features, few rows:</strong> LDA needs to estimate the within-class covariance matrix, and with more features than samples it is badly behaved (it cannot be inverted). <strong>Shrinkage</strong> blends the estimate with a simple diagonal matrix. In a synthetic test with 60 rows and 100 features, plain LDA scored 0.70 in cross-validation and LDA with <code>shrinkage="auto"</code> scored 0.817 (one dataset, so take it as an illustration).</p>
+
+<h2>5. LDA in scikit-learn</h2>
+<p>Our ten points reproduce the hand calculation (scikit-learn scales the axis so the pooled within-class variance of the scores is 1, and it may flip the sign; the <em>direction</em> is the same):</p>
+<pre class="code">
+import numpy as np
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.decomposition import PCA
+
+X = np.array([[0, 2], [1, 4], [2, 3], [3, 6], [4, 5],       # class A
+              [2, 0], [3, 2], [4, 1], [5, 4], [6, 3]], float)   # class B
+y = np.array([0] * 5 + [1] * 5)
+
+lda = LDA(solver="eigen", n_components=1).fit(X, y)
+print(lda.means_)                        # [[2. 4.] [4. 2.]]     the class averages
+print(lda.scalings_[:, 0])               # [-1.118  1.118]       the direction (-1, 1) = our (1, -1), sign flipped
+print(lda.transform(X).ravel().round(2)) # [ 2.24  3.35  1.12  3.35  1.12 -2.24 -1.12 -3.35 -1.12 -3.35]   perfectly separated at 0
+print(lda.score(X, y))                   # 1.0
+
+pc1 = PCA(1).fit(X)
+print(pc1.components_)                   # [[0.7071 0.7071]]     the diagonal: useless for the classes
+z = pc1.transform(X).ravel()
+print(z[:5].round(2), z[5:].round(2))    # both classes: [-2.83 -0.71 -0.71  2.12  2.12]  identical!
+</pre>
+<p>Real data. All figures below are from an actual run with scikit-learn 1.9.0 (5-fold stratified cross-validation, shuffled with a fixed seed; other versions or seeds will differ slightly):</p>
+<pre class="code">
+from sklearn.datasets import load_iris, load_wine, load_digits
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis as QDA
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+Xi, yi = load_iris(return_X_y=True)
+Xw, yw = load_wine(return_X_y=True)
+
+print(LDA(solver="eigen").fit(Xi, yi).explained_variance_ratio_)     # [0.9912 0.0088]   iris: two discriminants
+print(LDA(solver="eigen").fit(Xw, yw).explained_variance_ratio_)     # [0.6875 0.3125]   wine
+
+# LDA and QDA as classifiers
+for name, (X_, y_) in {"iris": (Xi, yi), "wine": (Xw, yw)}.items():
+    print(name, cross_val_score(LDA(), X_, y_, cv=cv).mean().round(4), cross_val_score(QDA(), X_, y_, cv=cv).mean().round(4))
+# iris  LDA 0.98    QDA 0.9667
+# wine  LDA 0.9943  QDA 0.9886
+
+# as a dimensionality reducer in front of KNN: 13 features -> 2, inside the pipeline so it is fitted on training folds only
+print(cross_val_score(make_pipeline(LDA(n_components=2), KNeighborsClassifier()), Xw, yw, cv=cv).mean())                        # 0.9887
+print(cross_val_score(make_pipeline(StandardScaler(), PCA(2), KNeighborsClassifier()), Xw, yw, cv=cv).mean())                  # 0.9663
+print(cross_val_score(make_pipeline(PCA(2), KNeighborsClassifier()), Xw, yw, cv=cv).mean())                                    # 0.6579  (unscaled PCA: proline dominates)
+
+Xd, yd = load_digits(return_X_y=True)                               # 64 pixels, 10 digits -> at most 9 discriminants
+print(cross_val_score(make_pipeline(LDA(n_components=9), KNeighborsClassifier()), Xd, yd, cv=cv).mean())                       # 0.9661
+print(cross_val_score(LDA(), Xd, yd, cv=cv).mean())                                                                            # 0.951
+
+LDA(n_components=3).fit(Xi, yi)      # ValueError: n_components cannot be larger than min(n_features, n_classes - 1)
+</pre>
+<p>Reading the numbers: with two components, LDA (98.9%) beat scaled PCA (96.6%) on wine, and beat unscaled PCA by a huge margin (65.8%). On iris the unscaled PCA does very well too (96%; iris's classes happen to differ along its high-variance directions), while scaled PCA scores 90% and LDA 96%. On the digits, two components of either method are weak (about 62% for PCA and 65% for LDA), but nine LDA components with KNN reach 96.6%. LDA is best when the classes really are separated by a few directions; it is not magic.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>solver</code></td><td><code>"svd"</code> (default: no covariance matrix needed, good for many features), <code>"lsqr"</code> (classification only, supports shrinkage), <code>"eigen"</code> (supports shrinkage and <code>explained_variance_ratio_</code>).</td></tr>
+<tr><td><code>n_components</code></td><td>Number of discriminant axes for <code>transform</code>: at most min(features, classes − 1).</td></tr>
+<tr><td><code>shrinkage</code></td><td><code>None</code>, <code>"auto"</code> (automatic amount) or a number from 0 to 1. Stabilises the covariance estimate with many features or few rows (solvers <code>"lsqr"</code> and <code>"eigen"</code>).</td></tr>
+<tr><td><code>priors</code></td><td>Class probabilities to use instead of the training frequencies.</td></tr>
+<tr><td><code>means_</code>, <code>scalings_</code>, <code>explained_variance_ratio_</code></td><td>Class averages; the discriminant directions; the share of class separation carried by each axis.</td></tr>
+<tr><td><code>predict</code>, <code>predict_proba</code>, <code>transform</code></td><td>Classify, get class probabilities, or project onto the discriminant axes.</td></tr>
+<tr><td><code>QuadraticDiscriminantAnalysis</code></td><td>The curved-boundary version with <code>reg_param</code> to regularise it.</td></tr>
+</table></div>
+
+<h2>6. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Uses the labels, so it keeps exactly the information that separates classes</td><td>Needs labels; at most C − 1 dimensions</td></tr>
+<tr><td>Fast, simple, no hyper-parameters to tune (apart from shrinkage); scale-invariant</td><td>Assumes roughly Gaussian classes with equal covariance; fails on curved or multi-lobed classes</td></tr>
+<tr><td>Also a probabilistic classifier, good with small samples</td><td>Affected by outliers; unstable with more features than rows (unless shrunk)</td></tr>
+<tr><td>Gives an interpretable picture: which combination of features separates the groups</td><td>Can only find linear combinations; not effective if the classes differ in spread but not in centre</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>😀 Face recognition</h4><p>"Fisherfaces": reduce images with PCA, then LDA, to find directions that distinguish people rather than lighting.</p></div>
+<div class="card"><h4>🩺 Medical diagnosis</h4><p>Combine several lab measurements into one discriminant score separating patient groups; the weights are interpretable.</p></div>
+<div class="card"><h4>💳 Credit scoring (historically)</h4><p>Altman's Z-score for predicting bankruptcy was one of the best-known applications of discriminant analysis.</p></div>
+<div class="card"><h4>🌿 Ecology and species classification</h4><p>Fisher's original iris example: separate species from flower measurements.</p></div>
+<div class="card"><h4>📊 Pre-processing for other classifiers</h4><p>Reduce to C − 1 discriminants before KNN or a tree, and to plot the classes.</p></div>
+<div class="card"><h4>🧠 Brain-signal decoding</h4><p>Regularised LDA is a standard, fast classifier for EEG signals in brain-computer interfaces.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>PCA</strong> maximises total variance and ignores labels; <strong>LDA</strong> maximises class separation and needs labels. They can pick very different axes: in our example PCA's axis gave J = 0 (classes identical) and LDA's gave J = 2.0 (perfect).</li>
+<li>Fisher's criterion: <b>J = (gap between class averages)² ÷ (within-class spread)</b>. The best direction for two classes is <b>w = S<sub>w</sub><sup>−1</sup> (μ<sub>B</sub> − μ<sub>A</sub>)</b>: in our example w ∝ (1, −1).</li>
+<li>With C classes there are at most <b>C − 1</b> discriminant axes (eigenvectors of S<sub>w</sub><sup>−1</sup>S<sub>b</sub>), and never more than the number of features.</li>
+<li>LDA is unaffected by rescaling features; PCA is affected.</li>
+<li>As a classifier, LDA assumes Gaussian classes with a <b>shared covariance</b> and gives linear boundaries; <b>QDA</b> allows different covariances (curved boundaries); <b>shrinkage</b> helps with many features and few rows; the <b>priors</b> shift the boundary.</li>
+<li>Put it inside a <code>Pipeline</code> when you use it before another model, so it is fitted on training folds only.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>Class A has average (1, 2), class B has average (5, 2), and the pooled within-class scatter is [[2, 0], [0, 2]]. Compute w = S<sub>w</sub><sup>−1</sup> × Δ. Which direction is that, and does it make sense?</li>
+<li>A dataset has 10 features and 4 classes. What is the largest number of LDA components you can use?</li>
+<li>On some direction the class averages are 1 and 4, and the within-class spreads (sums of squared deviations) are 1.5 and 1.5. What is J?</li>
+<li>Why can't LDA produce more than C − 1 components?</li>
+<li>Bonus: run the wine code. Turn on <code>shrinkage="auto"</code> with <code>solver="lsqr"</code> for LDA as a classifier: does it change the cross-validated accuracy?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Δ = (5 − 1, 2 − 2) = (4, 0). S<sub>w</sub><sup>−1</sup> = [[0.5, 0], [0, 0.5]], so w = (2, 0): the <b>x direction</b>. That makes sense: the classes differ only in x, and the clouds are round (no stretch to correct for), so the best axis is simply the line joining the two averages.</p>
+<p><b>2.</b> min(10, 4 − 1) = <b>3</b>.</p>
+<p><b>3.</b> J = (4 − 1)² ÷ (1.5 + 1.5) = 9 ÷ 3 = <b>3</b>.</p>
+<p><b>4.</b> The C class averages lie in a space of at most C − 1 dimensions (two points define a line, three define a plane, and so on), so the between-class scatter matrix has at most C − 1 non-zero directions: beyond that there is no class separation left to capture.</p>
+<p><b>5.</b> On the wine data the plain LDA classifier is already at 0.9943, so shrinkage can change it by at most a fraction of a row or two: don't expect a visible effect. Shrinkage matters when features outnumber rows (my synthetic test: 0.70 → 0.82).</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/pca-data.js"></script>
+<script src="../../js/pages/lda.js"></script>
+</body>
+</html>

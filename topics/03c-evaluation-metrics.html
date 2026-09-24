@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluation Metrics · ML, Visually</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-topic="metrics">
+<article id="lesson">
+
+<h1>Evaluation Metrics: How Good Is the Model?</h1>
+<p class="lede">A trained model gives predictions. A <strong>metric</strong> turns those predictions into a number that answers one question: <em>how good is it?</em> Choosing the wrong metric is one of the most common ways to fool yourself in machine learning. This lesson explains every important metric in simple words, with hand-worked numbers, so you know what each one measures, when it lies, and which to use.</p>
+<div class="meta"><span class="chip">Essential</span><span class="chip plain">≈ 120 min</span><span class="chip plain">4 interactive demos</span></div>
+<div class="callout tip"><p><strong>What was already covered, and what is new.</strong> The ML Workflow lesson gave a short tour of the basics: MAE, MSE, RMSE, R², the confusion matrix, accuracy, precision, recall and F1. Here we go much deeper and add what was missing: <strong>thresholds, ROC curves and AUC, precision–recall curves, specificity, balanced accuracy, MCC, log-loss, multi-class averaging, choosing a metric from real costs, baselines, and how uncertain a test score really is.</strong> Skim the parts you know; the worked examples and demos are new.</p></div>
+
+<h2>1. Why we need metrics, and three golden rules</h2>
+<div class="callout analogy"><p><strong>Exams measure different things.</strong> A student can get 85% overall and still fail every geometry question. A single mark hides weaknesses; a report with separate marks reveals them. Metrics are the "exam marks" of a model: each one tests something different, and the right report depends on what you need the model for.</p></div>
+<ol>
+<li><strong>Always measure on data the model has not seen.</strong> Training scores reward memorising. Use a test set (or cross-validation), as in the workflow lesson.</li>
+<li><strong>Always compare with a baseline.</strong> A "dumb" model that predicts the most common class (or the average value) shows what a score is worth. In scikit-learn: <code>DummyClassifier</code> and <code>DummyRegressor</code>. On the breast-cancer data, always predicting "benign" is right 62.9% of the time, so a model must clearly beat 62.9%. On the diabetes data, always predicting the average gives R² = 0 and an average miss (MAE) of 58.3.</li>
+<li><strong>Choose the metric from the real-world cost of mistakes</strong>, not from habit. Missing a cancer and sending a false alarm are not equally bad; being off by 5 units and by 50 units may not be equally bad either.</li>
+</ol>
+<p>Two families of metrics follow the two kinds of supervised problem: <strong>regression</strong> (predicting a number) and <strong>classification</strong> (predicting a category).</p>
+
+<h2>2. Regression metrics: how far off are the numbers?</h2>
+<p>For every prediction the <strong>error</strong> (or residual) is <b>actual − predicted</b>. It can be positive (predicted too low) or negative (too high). The metrics below combine the errors of all the test cases into one number in different ways.</p>
+<div class="tw"><table>
+<tr><th>Metric</th><th>How it is computed</th><th>In words</th><th>Watch out</th></tr>
+<tr><td><strong>MAE</strong> (mean absolute error)</td><td>average of |error|</td><td>"On average I miss by this much", in the units of y</td><td>treats a miss of 10 as exactly twice a miss of 5</td></tr>
+<tr><td><strong>MSE</strong> (mean squared error)</td><td>average of error²</td><td>like MAE but big misses count much more</td><td>units are squared (dollars²): hard to read</td></tr>
+<tr><td><strong>RMSE</strong></td><td>√MSE</td><td>MSE brought back to the units of y</td><td>sensitive to outliers; always ≥ MAE</td></tr>
+<tr><td><strong>Median absolute error</strong></td><td>middle value of |error|</td><td>"the typical miss": half the misses are smaller</td><td>ignores the worst mistakes completely</td></tr>
+<tr><td><strong>MAPE</strong> (mean absolute percentage error)</td><td>average of |error| ÷ |actual|</td><td>the miss as a percentage of the true value</td><td>breaks when the true value is 0 or tiny; punishes over- and under-prediction unequally</td></tr>
+<tr><td><strong>R²</strong> (coefficient of determination)</td><td>1 − (model's squared error ÷ squared error of always guessing the mean)</td><td>the share of the variation in y that the model explains: 1 = perfect, 0 = no better than the mean</td><td>can be <b>negative</b> (worse than the mean); says nothing about the size of errors in real units</td></tr>
+<tr><td><strong>Adjusted R²</strong></td><td>1 − (1 − R²) × (n − 1) ÷ (n − p − 1)</td><td>R² with a penalty for each extra feature (n rows, p features)</td><td>plain R² can only go up when you add features, even useless ones</td></tr>
+</table></div>
+<h3>By hand: five houses</h3>
+<div class="tw"><table>
+<tr><th>House</th><th class="num">Actual price</th><th class="num">Predicted</th><th class="num">Error (actual − predicted)</th><th class="num">|Error|</th><th class="num">Error²</th><th class="num">|Error| ÷ actual</th></tr>
+<tr><td>1</td><td class="num">10</td><td class="num">11</td><td class="num">−1</td><td class="num">1</td><td class="num">1</td><td class="num">0.100</td></tr>
+<tr><td>2</td><td class="num">12</td><td class="num">10</td><td class="num">+2</td><td class="num">2</td><td class="num">4</td><td class="num">0.167</td></tr>
+<tr><td>3</td><td class="num">15</td><td class="num">16</td><td class="num">−1</td><td class="num">1</td><td class="num">1</td><td class="num">0.067</td></tr>
+<tr><td>4</td><td class="num">20</td><td class="num">22</td><td class="num">−2</td><td class="num">2</td><td class="num">4</td><td class="num">0.100</td></tr>
+<tr><td>5</td><td class="num">30</td><td class="num">24</td><td class="num">+6</td><td class="num">6</td><td class="num">36</td><td class="num">0.200</td></tr>
+<tr><th>Total</th><td></td><td></td><td></td><td class="num"><b>12</b></td><td class="num"><b>46</b></td><td class="num"><b>0.633</b></td></tr>
+</table></div>
+<div class="callout math">
+<ul>
+<li><b>MAE</b> = 12 ÷ 5 = <b>2.4</b> (in price units).</li>
+<li><b>MSE</b> = 46 ÷ 5 = <b>9.2</b>; <b>RMSE</b> = √9.2 = <b>3.03</b>. RMSE is bigger than MAE because of the one large miss (house 5).</li>
+<li><b>Median absolute error</b>: the sorted |errors| are 1, 1, 2, 2, 6, so the median is <b>2</b>.</li>
+<li><b>MAPE</b> = 0.633 ÷ 5 = 0.127, i.e. <b>12.7%</b>.</li>
+<li><b>R²</b>: the average price is (10 + 12 + 15 + 20 + 30) ÷ 5 = 17.4. The "lazy guess" (always 17.4) has squared errors 7.4² + 5.4² + 2.4² + 2.6² + 12.6² = 54.76 + 29.16 + 5.76 + 6.76 + 158.76 = <b>255.2</b>. Our model's squared errors total <b>46</b>. So R² = 1 − 46 ÷ 255.2 = <b>0.82</b>: the model explains 82% of the variation in prices.</li>
+<li><b>Adjusted R²</b> (illustration): with R² = 0.82, n = 50 rows and p = 3 features: 1 − 0.18 × 49 ÷ 46 = <b>0.808</b>, slightly lower.</li>
+</ul>
+<p><strong>What if one prediction is very wrong?</strong> Change house 5's prediction from 24 to 10 (an error of 20). MAE rises from 2.4 to <b>5.2</b> (about doubles); the median absolute error stays 2; but RMSE jumps from 3.03 to <b>9.06</b> (triples) and R² falls from 0.82 to <b>−0.61</b>, <em>worse than guessing the average</em>. Squaring makes a single disaster dominate.</p></div>
+<div class="demo" data-title="Regression metrics and the outlier effect" id="demo-reg">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p><strong>Which regression metric should I use?</strong> Use <b>MAE</b> (or the median error) when you want an easy-to-explain average miss and outliers are not the main worry. Use <b>RMSE</b> when large errors are especially costly (a delivery that is an hour late is worse than two that are 30 minutes late). Use <b>MAPE</b> only when the target is always well above zero and relative error is what matters. Use <b>R²</b> to say how much better you are than the average-guess baseline, and always report an error in real units next to it.</p>
+<p>A real example (scikit-learn 1.9.0, the diabetes dataset, a linear regression tested on a held-out quarter of the data): <b>MAE 45.1</b>, <b>median error 40.5</b>, <b>RMSE 56.4</b>, <b>R² 0.36</b>. The always-predict-the-mean baseline gets MAE 58.3 and R² ≈ 0. So the model explains about a third of the variation and its typical miss is 45 units (the target itself has a standard deviation of 70): better than the baseline, but far from precise. Two numbers tell that story better than one.</p>
+<div class="callout tip"><p><strong>Also look at the residuals.</strong> Plot the errors against the predictions. A healthy model has errors scattered randomly around zero. A curve means the model missed a non-linear pattern; errors that grow with the prediction size mean it is less reliable for big values; a few extreme dots are outliers worth investigating. And always compare the <em>training</em> error with the <em>test</em> error: a much smaller training error means overfitting.</p></div>
+
+<h2>3. Classification metrics: right or wrong, and what kind of wrong</h2>
+<h3>The confusion matrix</h3>
+<p>Choose one class to call <strong>positive</strong> (usually the rare or important one: "has the disease", "is fraud", "is spam"). Every prediction then falls into one of four boxes:</p>
+<div class="tw"><table>
+<tr><th></th><th>Predicted positive</th><th>Predicted negative</th></tr>
+<tr><th>Actually positive</th><td><b>TP</b> true positive: caught it</td><td><b>FN</b> false negative: missed it</td></tr>
+<tr><th>Actually negative</th><td><b>FP</b> false positive: false alarm</td><td><b>TN</b> true negative: correctly ignored</td></tr>
+</table></div>
+<p>(Scikit-learn's <code>confusion_matrix</code> prints the same counts as [[TN, FP], [FN, TP]] with rows = actual, columns = predicted, for classes ordered 0 then 1.)</p>
+<h3>By hand: 100 patients, 10 of them sick</h3>
+<p>A screening model flags 12 people. Of the 10 sick patients it catches 8 and misses 2. Of the 90 healthy people it wrongly flags 4. So <b>TP = 8, FN = 2, FP = 4, TN = 86</b>.</p>
+<div class="tw"><table>
+<tr><th>Metric</th><th>Question it answers</th><th>Formula</th><th class="num">Here</th></tr>
+<tr><td><strong>Accuracy</strong></td><td>How often is the model right overall?</td><td>(TP + TN) ÷ all</td><td class="num">94 ÷ 100 = <b>0.94</b></td></tr>
+<tr><td><strong>Precision</strong></td><td>When it says "positive", how often is it right?</td><td>TP ÷ (TP + FP)</td><td class="num">8 ÷ 12 = <b>0.667</b></td></tr>
+<tr><td><strong>Recall</strong> (also sensitivity, true-positive rate, TPR)</td><td>Of all the real positives, how many did it catch?</td><td>TP ÷ (TP + FN)</td><td class="num">8 ÷ 10 = <b>0.80</b></td></tr>
+<tr><td><strong>Specificity</strong> (true-negative rate)</td><td>Of all the real negatives, how many did it correctly leave alone?</td><td>TN ÷ (TN + FP)</td><td class="num">86 ÷ 90 = <b>0.956</b></td></tr>
+<tr><td><strong>False-positive rate</strong> (FPR)</td><td>Of all the real negatives, how many did it wrongly flag?</td><td>FP ÷ (FP + TN) = 1 − specificity</td><td class="num">4 ÷ 90 = <b>0.044</b></td></tr>
+<tr><td><strong>F1 score</strong></td><td>One number that is high only when precision <em>and</em> recall are both high</td><td>2 × P × R ÷ (P + R)</td><td class="num">2 × 0.667 × 0.8 ÷ 1.467 = <b>0.727</b></td></tr>
+<tr><td><strong>Balanced accuracy</strong></td><td>Accuracy that gives each class equal weight</td><td>(recall + specificity) ÷ 2</td><td class="num">(0.8 + 0.956) ÷ 2 = <b>0.878</b></td></tr>
+<tr><td><strong>MCC</strong> (Matthews correlation)</td><td>A correlation between predictions and truth using all four boxes; −1 to +1</td><td>(TP × TN − FP × FN) ÷ √((TP+FP)(TP+FN)(TN+FP)(TN+FN))</td><td class="num">(688 − 8) ÷ √950,400 = <b>0.70</b></td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Why F1 uses a "harmonic" average and not the plain average.</strong> Suppose a model flags everything as positive: recall = 1.0 but precision = 0.01. The ordinary average is 0.505, which sounds acceptable. The F1 is 2 × 0.01 × 1 ÷ 1.01 = <b>0.02</b>. The harmonic average is dominated by the <em>smaller</em> of the two numbers, so a model cannot hide a terrible precision behind a perfect recall (or the other way round).</p>
+<p><strong>F-beta.</strong> When recall matters more than precision (finding cancer), use F2, which weights recall more: F<sub>β</sub> = (1 + β²) × P × R ÷ (β² × P + R). For our patients F2 = 5 × 0.667 × 0.8 ÷ (4 × 0.667 + 0.8) = <b>0.769</b> (compared with F1 = 0.727). When precision matters more, use F0.5.</p>
+<p><strong>The accuracy trap.</strong> Take a lazy model that says "healthy" for everyone. On these 100 patients it scores accuracy 90 ÷ 100 = <b>0.90</b> (better than it should be!), yet its recall is <b>0</b>: it finds no sick patient at all. Our real model's accuracy of 0.94 sounds only slightly better, but its recall of 0.8 is the whole point. <em>With rare positives, accuracy is almost useless; use recall, precision, F1 or the curves in the next section.</em></p></div>
+<div class="tw"><table>
+<tr><th>Which mistake hurts more?</th><th>Watch</th><th>Examples</th></tr>
+<tr><td>Missing a real positive (false negative)</td><td><b>Recall</b> (F2)</td><td>cancer screening, fraud detection, safety defects, failure prediction</td></tr>
+<tr><td>A false alarm (false positive)</td><td><b>Precision</b> (F0.5)</td><td>spam filtering (good mail lost), recommending a product to the wrong people, arresting the wrong person</td></tr>
+<tr><td>Both matter, classes are unbalanced</td><td><b>F1</b>, MCC, balanced accuracy</td><td>most rare-event problems</td></tr>
+<tr><td>Classes are balanced and mistakes cost the same</td><td><b>Accuracy</b> is fine</td><td>digit recognition, balanced surveys</td></tr>
+</table></div>
+<p><strong>A real example.</strong> Logistic regression on the breast-cancer data (143 test patients: 53 malignant, 90 benign), scikit-learn 1.9.0. The confusion matrix is [[52, 1], [1, 89]]: only two mistakes. Accuracy <b>0.986</b>; precision and recall for "benign" are both <b>0.989</b>. If we instead treat <em>malignant</em> as the positive class (the one we cannot afford to miss), the recall becomes 52 ÷ 53 = <b>0.981</b> and the precision 0.981. The baseline that always says "benign" scores 0.629. Notice that "which class is positive" changes the numbers: choose it on purpose.</p>
+
+<h2>4. Thresholds, ROC curves and AUC</h2>
+<p>Most classifiers do not output a class directly: they output a <strong>score or probability</strong>, and a <strong>threshold</strong> (0.5 by default) turns it into a class: "positive if the score is at least the threshold". Moving the threshold is a control knob:</p>
+<ul>
+<li><b>Lower</b> threshold → more cases called positive → higher recall, but more false alarms (lower precision).</li>
+<li><b>Higher</b> threshold → fewer cases called positive → higher precision, but more misses (lower recall).</li>
+</ul>
+<p>On the breast-cancer model (positive = the "benign" class, 90 real positives out of 143), sweeping the threshold gave:</p>
+<div class="tw"><table>
+<tr><th class="num">Threshold</th><th class="num">TP</th><th class="num">FP</th><th class="num">FN</th><th class="num">TN</th><th class="num">Precision</th><th class="num">Recall</th></tr>
+<tr><td class="num">0.30</td><td class="num">90</td><td class="num">3</td><td class="num">0</td><td class="num">50</td><td class="num">0.968</td><td class="num">1.000</td></tr>
+<tr><td class="num">0.50</td><td class="num">89</td><td class="num">1</td><td class="num">1</td><td class="num">52</td><td class="num">0.989</td><td class="num">0.989</td></tr>
+<tr><td class="num">0.70</td><td class="num">84</td><td class="num">1</td><td class="num">6</td><td class="num">52</td><td class="num">0.988</td><td class="num">0.933</td></tr>
+<tr><td class="num">0.90</td><td class="num">79</td><td class="num">0</td><td class="num">11</td><td class="num">53</td><td class="num">1.000</td><td class="num">0.878</td></tr>
+<tr><td class="num">0.97</td><td class="num">66</td><td class="num">0</td><td class="num">24</td><td class="num">53</td><td class="num">1.000</td><td class="num">0.733</td></tr>
+</table></div>
+<p>Try it yourself. The top plot shows the model's scores for the negatives (blue) and positives (orange); the further apart the two piles, the better the model. The threshold line splits them. Watch the confusion counts and the two curves at the bottom (explained next):</p>
+<div class="demo" data-title="Move the threshold" id="demo-threshold">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>The ROC curve</h3>
+<p>The <strong>ROC curve</strong> (receiver operating characteristic) plots, for <em>every possible threshold</em> at once, the <b>recall (true-positive rate)</b> on the vertical axis against the <b>false-positive rate</b> on the horizontal axis. Start with a threshold so high that nothing is called positive: bottom-left corner (0, 0). Lower it step by step: every real positive you gain moves the curve <b>up</b>; every false alarm moves it <b>right</b>. At the end everything is positive: top-right corner (1, 1). A perfect model shoots straight up first (all positives ranked above all negatives), then right: the top-left corner. A useless model follows the diagonal.</p>
+<p>The <strong>AUC</strong> (area under the ROC curve) squeezes the whole curve into one number between 0 and 1:</p>
+<ul>
+<li><b>1.0</b> perfect ranking · <b>0.5</b> no better than random guessing · below 0.5 worse than random (the ranking is backwards: flip the scores).</li>
+<li><b>Simple meaning:</b> if you pick one random positive case and one random negative case, the AUC is the probability that the model gives the positive a <em>higher score</em>. It measures how well the model <em>ranks</em>, independent of any threshold.</li>
+</ul>
+<h3>By hand: an ROC curve from ten cases</h3>
+<p>Ten cases, sorted by the model's score (highest first). Five are really positive (P) and five negative (N):</p>
+<div class="tw"><table>
+<tr><th>Rank</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td></tr>
+<tr><th>Score</th><td class="num">0.95</td><td class="num">0.90</td><td class="num">0.80</td><td class="num">0.70</td><td class="num">0.65</td><td class="num">0.55</td><td class="num">0.45</td><td class="num">0.40</td><td class="num">0.30</td><td class="num">0.10</td></tr>
+<tr><th>Truth</th><td>P</td><td>P</td><td>N</td><td>P</td><td>P</td><td>N</td><td>P</td><td>N</td><td>N</td><td>N</td></tr>
+</table></div>
+<div class="callout math">
+<p>Walk the threshold down one case at a time. With 5 positives and 5 negatives, each P moves the curve up by 1/5 = 0.2, each N moves it right by 0.2. The points (false-positive rate, recall) visited: (0, 0) → after rank 1 (P): (0, 0.2) → rank 2 (P): (0, 0.4) → rank 3 (N): (0.2, 0.4) → rank 4 (P): (0.2, 0.6) → rank 5 (P): (0.2, 0.8) → rank 6 (N): (0.4, 0.8) → rank 7 (P): (0.4, 1.0) → rank 8 (N): (0.6, 1.0) → rank 9 (N): (0.8, 1.0) → rank 10 (N): (1.0, 1.0).</p>
+<p><strong>Area under this staircase</strong> = <b>0.84</b>. The pair-counting meaning gives the same number: there are 5 × 5 = 25 (positive, negative) pairs. For each positive, count the negatives ranked <em>below</em> it: rank 1 → 5, rank 2 → 5, rank 4 (0.70) → 4 (0.55, 0.40, 0.30, 0.10), rank 5 (0.65) → 4, rank 7 (0.45) → 3. Total = 21 of 25 pairs correctly ordered = <b>0.84</b>. (Check with scikit-learn: <code>roc_auc_score</code> gives 0.84.)</p></div>
+<div class="demo" data-title="Build the ROC curve, one case at a time" id="demo-roc">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>Precision–recall curves and imbalanced data</h3>
+<p>The ROC curve has a weakness with rare positives: the false-positive rate divides by the (huge) number of negatives, so even hundreds of false alarms barely move it, and the AUC can look great while the model is practically useless in use. The <strong>precision–recall (PR) curve</strong> plots precision against recall over all thresholds and is much more honest for rare events. Its summary number is the <strong>average precision (AP)</strong>, roughly the area under the PR curve. The reference "useless model" here is a horizontal line at the <b>share of positives</b> (the prevalence): an AP of 0.30 in a problem with 2% positives is a big improvement over 0.02, whereas the same 0.30 with 50% positives would be poor.</p>
+<div class="callout math"><p><strong>Average precision by hand</strong>, on the same ten cases. Each time the walk meets a positive, note the precision at that point (positives found so far ÷ cases called positive so far): rank 1: 1 ÷ 1 = 1.00; rank 2: 2 ÷ 2 = 1.00; rank 4: 3 ÷ 4 = 0.75; rank 5: 4 ÷ 5 = 0.80; rank 7: 5 ÷ 7 = 0.714. The average of these five numbers is <b>0.853</b>, the AP (scikit-learn: 0.8529).</p></div>
+<p><strong>A real illustration of the trap.</strong> I built a synthetic dataset with 20,000 cases of which 2% are positive and trained a logistic regression (scikit-learn 1.9.0). On the 5,000 test cases (100 positives): <b>accuracy 0.98</b> (exactly what "always say negative" scores), <b>recall 0.0</b> and precision undefined (the model at the default 0.5 threshold called <em>nothing</em> positive), ROC AUC <b>0.78</b> (sounds decent!), but average precision only <b>0.14</b> against a baseline of 0.02. Accuracy was flattering, the ROC AUC hid the difficulty, and the PR curve and recall told the truth. In such problems, lower the threshold, look at the PR curve, and judge by recall at a precision you can live with. Sweeping the threshold on the same model: at 0.2 it catches 3 of the 100 positives (3 false alarms: precision 0.50, recall 0.03); at 0.1 it catches 16 (69 false alarms: precision 0.19, recall 0.16); at 0.05 it catches 39 (355 false alarms: precision 0.10, recall 0.39). Each step up in recall costs many more false alarms, which is exactly what the PR curve shows and the accuracy number cannot.</p>
+<h3>Choosing the threshold from costs</h3>
+<p>The best threshold is not automatically 0.5; it depends on what each mistake costs. Here is a <em>hypothetical</em> example with the 100 screened patients: a missed sick patient (FN) costs <b>20</b> units (late treatment), a false alarm (FP) costs <b>1</b> unit (an extra test). Three thresholds give: A (low): TP 9, FP 15, FN 1 → cost = 15 × 1 + 1 × 20 = <b>35</b>; B (medium, the one above): TP 8, FP 4, FN 2 → 4 + 40 = <b>44</b>; C (high): TP 5, FP 1, FN 5 → 1 + 100 = <b>101</b>. The cheapest is the <em>lowest</em> threshold, even though it produces the most false alarms, because misses are so much more expensive. Write down the costs first, then pick the threshold (and metric) that minimises them.</p>
+<h3>When the probability itself matters: log-loss and calibration</h3>
+<p>Sometimes you need trustworthy <em>probabilities</em> (a 30% chance of default drives a price). Two metrics judge probabilities:</p>
+<ul>
+<li><strong>Log-loss</strong> (cross-entropy) = the average of −ln(probability given to the true class). Confident and right costs almost nothing: giving 0.9 to the true class costs −ln 0.9 = <b>0.105</b>. Confident and wrong is punished severely: giving only 0.1 to the true class costs −ln 0.1 = <b>2.303</b>. Lower is better.</li>
+<li><strong>Brier score</strong> = the average of (probability − truth)², where truth is 0 or 1. Lower is better; it is simply the mean squared error of the probabilities.</li>
+</ul>
+<p>On the breast-cancer model: log-loss <b>0.068</b>, Brier score <b>0.018</b>, ROC AUC <b>0.998</b>, average precision <b>0.999</b>. A model can rank well (high AUC) yet give badly calibrated probabilities; <strong>calibration</strong> asks "when the model says 80%, is it right about 80% of the time?" (see <code>sklearn.calibration.calibration_curve</code> and <code>CalibratedClassifierCV</code>).</p>
+
+<h2>5. More than two classes</h2>
+<p>With C classes the confusion matrix is C × C: rows are the actual class, columns the predicted class, and the diagonal holds the correct predictions. Precision and recall are then computed <strong>one class at a time</strong> ("this class versus all the others") and combined by an averaging rule:</p>
+<div class="tw"><table>
+<tr><th>Average</th><th>How</th><th>Use when</th></tr>
+<tr><td><strong>Macro</strong></td><td>compute the metric for each class and take the plain average: every class counts equally</td><td>rare classes matter as much as common ones</td></tr>
+<tr><td><strong>Weighted</strong></td><td>the same, but weighted by how many cases each class has (its "support")</td><td>you care about overall performance across cases, while still seeing per-class detail</td></tr>
+<tr><td><strong>Micro</strong></td><td>pool all the true/false positives together, then compute once (for ordinary single-label problems this equals accuracy)</td><td>you want one number that treats every case equally</td></tr>
+</table></div>
+<h3>By hand: three classes</h3>
+<p>35 test cases: class A has 20, class B 10, class C 5. Confusion matrix (rows = actual, columns = predicted):</p>
+<div class="tw"><table>
+<tr><th></th><th class="num">predicted A</th><th class="num">predicted B</th><th class="num">predicted C</th><th class="num">total (support)</th></tr>
+<tr><th>actual A</th><td class="num"><b>16</b></td><td class="num">2</td><td class="num">2</td><td class="num">20</td></tr>
+<tr><th>actual B</th><td class="num">1</td><td class="num"><b>7</b></td><td class="num">2</td><td class="num">10</td></tr>
+<tr><th>actual C</th><td class="num">0</td><td class="num">1</td><td class="num"><b>4</b></td><td class="num">5</td></tr>
+<tr><th>predicted total</th><td class="num">17</td><td class="num">10</td><td class="num">8</td><td class="num">35</td></tr>
+</table></div>
+<div class="callout math">
+<p><b>Per class.</b> Precision = the diagonal number ÷ the column total; recall = the diagonal number ÷ the row total.</p>
+<div class="tw"><table>
+<tr><th>Class</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th></tr>
+<tr><td>A</td><td class="num">16 ÷ 17 = 0.941</td><td class="num">16 ÷ 20 = 0.800</td><td class="num">0.865</td></tr>
+<tr><td>B</td><td class="num">7 ÷ 10 = 0.700</td><td class="num">7 ÷ 10 = 0.700</td><td class="num">0.700</td></tr>
+<tr><td>C</td><td class="num">4 ÷ 8 = 0.500</td><td class="num">4 ÷ 5 = 0.800</td><td class="num">0.615</td></tr>
+</table></div>
+<p><b>Accuracy</b> = (16 + 7 + 4) ÷ 35 = <b>0.771</b> (= micro-averaged F1). <b>Macro F1</b> = (0.865 + 0.700 + 0.615) ÷ 3 = <b>0.727</b>. <b>Weighted F1</b> = (20 × 0.865 + 10 × 0.700 + 5 × 0.615) ÷ 35 = <b>0.782</b>. The macro average is lower because the small class C (poor precision) counts as much as the large class A. This exact table is what <code>classification_report</code> prints.</p></div>
+<p>Also useful: <strong>top-k accuracy</strong> (is the true class among the model's k best guesses? common in image classification) and, for multi-label tasks (several correct labels per item), per-label metrics or the Hamming loss.</p>
+
+<h2>6. Metrics for other kinds of problems</h2>
+<div class="tw"><table>
+<tr><th>Problem</th><th>Typical metrics</th></tr>
+<tr><td>Clustering (no labels)</td><td>silhouette, inertia, stability; adjusted Rand index when true labels exist (see the clustering lessons)</td></tr>
+<tr><td>Dimensionality reduction</td><td>explained variance ratio, reconstruction error (see PCA)</td></tr>
+<tr><td>Ranking and recommendations</td><td>precision@k, recall@k, average precision, NDCG (rewards putting the best items at the top)</td></tr>
+<tr><td>Anomaly detection (very rare positives)</td><td>precision–recall curve, recall at a fixed false-alarm budget</td></tr>
+<tr><td>Association rules</td><td>support, confidence, lift</td></tr>
+<tr><td>Reinforcement learning</td><td>average return per episode, success rate</td></tr>
+<tr><td>Forecasting</td><td>MAE, RMSE, MAPE, always on the <em>future</em> part of a time-ordered split</td></tr>
+</table></div>
+
+<h2>7. Evaluating fairly, and how much to trust a score</h2>
+<h3>Cross-validation gives a score and a spread</h3>
+<p>One train/test split gives one number that depends partly on luck. Cross-validation (Grid Search CV lesson) repeats the evaluation on several splits, so you can report a mean <em>and</em> a spread. Logistic regression on the whole breast-cancer data, 5-fold stratified (scikit-learn 1.9.0): accuracy <b>0.979 ± 0.014</b>, precision 0.975 ± 0.018, recall 0.992 ± 0.007, F1 0.983 ± 0.011, ROC AUC 0.9955 ± 0.006. The "±" is the standard deviation across the five folds.</p>
+<h3>A test score is only an estimate</h3>
+<p>If the model's true accuracy is 90% and you test it on 100 random cases, you will not see exactly 90%: you might see 87% or 94%. For a percentage measured on n cases, the typical wobble (standard error) is <b>√(p × (1 − p) ÷ n)</b>, and about 95% of the time the measured value falls within <b>±1.96</b> standard errors of the truth.</p>
+<div class="callout math"><p>Accuracy p = 0.90. With n = 50 test cases: standard error = √(0.9 × 0.1 ÷ 50) = 0.042, so the 95% range is about <b>±8 points</b> (82% to 98%). With n = 200: ±4.2 points. With n = 1,000: ±1.9 points. Quadrupling the test set only halves the uncertainty. <strong>So a model that scores 91% and another that scores 92% on 100 cases are statistically indistinguishable.</strong></p></div>
+<div class="demo" data-title="How much does a test score wobble?" id="demo-ci">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>More habits of honest evaluation</h3>
+<ul>
+<li><strong>Never tune on the test set.</strong> Choose models and thresholds with validation data or cross-validation; use the test set once at the end.</li>
+<li><strong>Use stratified splits</strong> for classification so that rare classes appear in every fold.</li>
+<li><strong>Prevent leakage:</strong> fit scalers, imputers and feature selection inside a pipeline, on training data only.</li>
+<li><strong>Compare models on the same splits</strong> and look at the spread, not just the mean.</li>
+<li><strong>Check subgroups.</strong> An overall 95% can hide 70% for a minority group or a specific region; report per-group metrics.</li>
+<li><strong>Test in realistic conditions:</strong> for time series, split by time; for new customers, hold out whole customers.</li>
+<li><strong>Watch train versus test:</strong> a large gap means overfitting; both low means underfitting.</li>
+</ul>
+
+<h2>8. Choosing the right metric: a decision guide</h2>
+<div class="tw"><table>
+<tr><th>Your situation</th><th>Start with</th></tr>
+<tr><td>Predict a number; big errors are especially bad</td><td>RMSE (plus MAE)</td></tr>
+<tr><td>Predict a number; outliers in the data are noise</td><td>MAE or median absolute error</td></tr>
+<tr><td>Predict a number; want relative errors and values are far from 0</td><td>MAPE</td></tr>
+<tr><td>Explain "how much better than the average"</td><td>R² (adjusted R² when comparing feature sets)</td></tr>
+<tr><td>Classes balanced, equal cost of mistakes</td><td>Accuracy</td></tr>
+<tr><td>Rare positives, missing them is costly</td><td>Recall at an acceptable precision; PR curve; F2</td></tr>
+<tr><td>Rare positives, false alarms are costly</td><td>Precision; F0.5</td></tr>
+<tr><td>Need one number for imbalanced data</td><td>F1, MCC, balanced accuracy, average precision</td></tr>
+<tr><td>Care about the ranking of cases, not a fixed cut-off</td><td>ROC AUC (balanced data) or average precision (rare positives)</td></tr>
+<tr><td>Probabilities are used directly</td><td>Log-loss, Brier score, calibration curve</td></tr>
+<tr><td>Many classes, some rare</td><td>Macro F1 plus the per-class report</td></tr>
+</table></div>
+<p>In practice, pick <strong>one main metric</strong> that reflects the goal, and add a few <strong>"guardrail" metrics</strong> that must not get worse (for example: maximise recall, but keep precision above 0.7). Always report the baseline and the uncertainty next to your number.</p>
+<div class="callout warn"><ul>
+<li><strong>Accuracy on imbalanced data.</strong> 98% accurate can mean 0% useful.</li>
+<li><strong>One metric only.</strong> A single number hides trade-offs; show precision and recall together.</li>
+<li><strong>Ignoring the baseline.</strong> "92%" means nothing until you know the dumb model gets 91%.</li>
+<li><strong>Metric that does not match the goal.</strong> Optimising accuracy when the business cares about catching fraud.</li>
+<li><strong>Trusting tiny differences.</strong> See the wobble above.</li>
+<li><strong>Using MAPE with zeros,</strong> or R² as the only regression number.</li>
+<li><strong>Judging on training data,</strong> or on a test set that leaked into training or tuning.</li>
+</ul></div>
+
+<h2>9. All of it in scikit-learn</h2>
+<pre class="code">
+from sklearn.metrics import (mean_absolute_error, mean_squared_error, median_absolute_error, r2_score,
+                             mean_absolute_percentage_error, confusion_matrix, accuracy_score, precision_score,
+                             recall_score, f1_score, fbeta_score, balanced_accuracy_score, matthews_corrcoef,
+                             roc_auc_score, roc_curve, average_precision_score, precision_recall_curve,
+                             log_loss, brier_score_loss, classification_report)
+
+# --- regression: our five houses ---------------------------------------------------------------
+y_true = [10, 12, 15, 20, 30]; y_pred = [11, 10, 16, 22, 24]
+print(mean_absolute_error(y_true, y_pred))             # 2.4
+print(mean_squared_error(y_true, y_pred) ** 0.5)       # 3.033   (RMSE)
+print(median_absolute_error(y_true, y_pred))           # 2.0
+print(mean_absolute_percentage_error(y_true, y_pred))  # 0.1267  (12.7%)
+print(r2_score(y_true, y_pred))                        # 0.8197
+
+# --- classification: the 100 patients (10 sick) ----------------------------------------------------
+import numpy as np
+y = np.array([1] * 10 + [0] * 90); pred = np.array([1] * 8 + [0] * 2 + [1] * 4 + [0] * 86)
+print(confusion_matrix(y, pred))                       # [[86  4]
+                                                       #  [ 2  8]]   rows = actual, columns = predicted: [[TN FP] [FN TP]]
+print(accuracy_score(y, pred), precision_score(y, pred), recall_score(y, pred))   # 0.94  0.667  0.8
+print(f1_score(y, pred), fbeta_score(y, pred, beta=2))                            # 0.727  0.769
+print(balanced_accuracy_score(y, pred), matthews_corrcoef(y, pred))               # 0.878  0.698
+
+# --- scores and curves: the ten ranked cases --------------------------------------------------------
+score = [.95, .90, .80, .70, .65, .55, .45, .40, .30, .10]; truth = [1, 1, 0, 1, 1, 0, 1, 0, 0, 0]
+print(roc_auc_score(truth, score))                     # 0.84
+print(average_precision_score(truth, score))           # 0.8529
+fpr, tpr, thresholds = roc_curve(truth, score)         # the points of the ROC curve (plot fpr against tpr)
+precision, recall, thr = precision_recall_curve(truth, score)
+
+# --- probabilities -------------------------------------------------------------------------------------
+# log_loss(y_true, prob_of_class_1)   brier_score_loss(y_true, prob_of_class_1)
+
+# --- many classes: our 35-case table ----------------------------------------------------------------
+# print(classification_report(y_true, y_pred, digits=3))
+#           precision  recall  f1-score  support
+#  class A     0.941    0.800    0.865      20
+#  class B     0.700    0.700    0.700      10
+#  class C     0.500    0.800    0.615       5
+#  accuracy                      0.771      35
+#  macro avg   0.714    0.767    0.727      35
+#  weighted    0.809    0.771    0.782      35
+</pre>
+<p>Everything above matches the hand calculations (I ran them). Using several metrics at once during cross-validation, and baselines:</p>
+<pre class="code">
+from sklearn.model_selection import cross_validate, StratifiedKFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.dummy import DummyClassifier, DummyRegressor
+
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+scores = cross_validate(model, X, y, cv=cv, scoring=["accuracy", "precision", "recall", "f1", "roc_auc"])
+for name in ("accuracy", "precision", "recall", "f1", "roc_auc"):
+    print(name, scores["test_" + name].mean().round(3), "+/-", scores["test_" + name].std().round(3))
+# accuracy 0.979 +/- 0.014 | precision 0.975 +/- 0.018 | recall 0.992 +/- 0.007 | f1 0.983 +/- 0.011 | roc_auc 0.996 +/- 0.006  (breast cancer)
+
+DummyClassifier(strategy="most_frequent").fit(X_train, y_train).score(X_test, y_test)   # 0.629: the bar to beat
+DummyRegressor().fit(X_train, y_train)                                                   # predicts the training mean; R2 about 0
+</pre>
+<div class="tw"><table>
+<tr><th>Task</th><th><code>scoring=</code> string for cross-validation and grid search</th></tr>
+<tr><td>Classification</td><td><code>"accuracy"</code>, <code>"balanced_accuracy"</code>, <code>"precision"</code>, <code>"recall"</code>, <code>"f1"</code>, <code>"roc_auc"</code>, <code>"average_precision"</code>, <code>"neg_log_loss"</code>, <code>"f1_macro"</code>, <code>"f1_weighted"</code>, <code>"matthews_corrcoef"</code></td></tr>
+<tr><td>Regression</td><td><code>"r2"</code>, <code>"neg_mean_absolute_error"</code>, <code>"neg_root_mean_squared_error"</code>, <code>"neg_mean_squared_error"</code>, <code>"neg_median_absolute_error"</code>, <code>"neg_mean_absolute_percentage_error"</code></td></tr>
+</table></div>
+<p>(Error metrics are prefixed with "neg_" because scikit-learn always <em>maximises</em> a score, so errors are negated: −2.4 is better than −5.2.)</p>
+
+<h2>10. Real-world use</h2>
+<div class="cards">
+<div class="card"><h4>🏥 Screening and diagnosis</h4><p>Recall (sensitivity) and specificity are reported together; the threshold is set from the cost of a missed case versus an unnecessary test.</p></div>
+<div class="card"><h4>💳 Fraud detection</h4><p>Less than 1% of transactions are fraud: accuracy is useless. Teams watch the precision–recall curve and the recall at a fixed number of alerts per day that analysts can review.</p></div>
+<div class="card"><h4>📧 Spam filters</h4><p>Precision is critical (a lost real email is worse than a spam that gets through), so the threshold is set high.</p></div>
+<div class="card"><h4>🏠 Price and demand forecasting</h4><p>MAE or RMSE in real currency or units, plus the error as a percentage, so business teams can judge whether it is good enough.</p></div>
+<div class="card"><h4>🔍 Search and recommendations</h4><p>Ranking metrics such as precision@k and NDCG measure whether the best items appear at the top of the list.</p></div>
+<div class="card"><h4>⚖️ Credit and risk scoring</h4><p>AUC for ranking risk, plus calibration checks because predicted probabilities feed pricing and regulation.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Measure on <strong>unseen data</strong>, compare with a <strong>baseline</strong>, and choose the metric from the <strong>real cost of mistakes</strong>.</li>
+<li><strong>Regression:</strong> MAE (average miss, in units), RMSE (punishes big misses), MAPE (percentage, needs values far from 0), R² (share explained; can be negative). On our five houses: MAE 2.4, RMSE 3.03, R² 0.82; one huge miss sends RMSE to 9.06 and R² to −0.61.</li>
+<li><strong>Classification:</strong> from the confusion matrix (TP, FP, FN, TN): accuracy, precision = TP ÷ (TP + FP), recall = TP ÷ (TP + FN), specificity, F1 (harmonic mean), balanced accuracy, MCC. With rare positives accuracy is misleading: a model that catches nothing can be 98% accurate.</li>
+<li><strong>Thresholds</strong> trade precision against recall. The <strong>ROC curve/AUC</strong> judge ranking (AUC = the chance a random positive outranks a random negative: 0.84 in our ten-case example); the <strong>PR curve/average precision</strong> are more honest for rare positives.</li>
+<li><strong>Probabilities:</strong> log-loss and Brier score (and calibration) judge whether the numbers themselves can be trusted.</li>
+<li><strong>Multi-class:</strong> per-class precision and recall, then macro (classes equal), weighted (by size) or micro (= accuracy) averaging: on our 3-class table macro F1 0.727, weighted 0.782, accuracy 0.771.</li>
+<li>A test score is an <strong>estimate</strong>: its uncertainty is about ±1.96 × √(p(1−p)/n) (±8 points on 50 cases, ±1.9 on 1,000). Use cross-validation, report the spread, and don't trust tiny differences.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (30 minutes, optional).</strong></p>
+<ol>
+<li>A model on 1,000 cases gives TP = 30, FP = 10, FN = 20, TN = 940. Compute accuracy, precision, recall and F1. Why does the accuracy look so much better than the recall?</li>
+<li>A regression model has MAE = 3 and RMSE = 5. What does the gap between them suggest?</li>
+<li>What does an AUC of 0.5 mean? What would you do about an AUC of 0.2?</li>
+<li>A confusion matrix (rows = actual, columns = predicted) is [[50, 10], [5, 35]], with the first row/column the negative class. Compute precision, recall and specificity for the positive class.</li>
+<li>A model scores 90% accuracy on 400 test cases. What is the approximate 95% range for its true accuracy?</li>
+<li>Bonus: run the code section's <code>cross_validate</code> on the breast-cancer data, then change <code>scoring</code> to <code>"f1_macro"</code> and compare.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Accuracy = (30 + 940) ÷ 1000 = <b>0.97</b>. Precision = 30 ÷ 40 = <b>0.75</b>. Recall = 30 ÷ 50 = <b>0.60</b>. F1 = 2 × 0.75 × 0.6 ÷ 1.35 = <b>0.667</b>. There are only 50 positives among 1,000 cases; the model is right about almost all the 950 negatives, which inflates accuracy, while it misses 40% of the positives.</p>
+<p><b>2.</b> RMSE is much larger than MAE, so the errors are uneven: most misses are small, but a few are large. Look at the largest residuals for outliers or a region where the model fails.</p>
+<p><b>3.</b> AUC 0.5 = no ranking ability, like random guessing. AUC 0.2 is worse than random: the model ranks backwards. Flipping its scores (or fixing a label mix-up) would give an AUC of about 0.8.</p>
+<p><b>4.</b> TN = 50, FP = 10, FN = 5, TP = 35. Precision = 35 ÷ 45 = <b>0.778</b>; recall = 35 ÷ 40 = <b>0.875</b>; specificity = 50 ÷ 60 = <b>0.833</b>.</p>
+<p><b>5.</b> Standard error = √(0.9 × 0.1 ÷ 400) = √0.000225 = 0.015; 1.96 × 0.015 = 0.029. So about <b>90% ± 2.9 points</b>, i.e. roughly 87% to 93%.</p>
+<p><b>6.</b> Expect similar values with <code>f1_macro</code> because the breast-cancer classes are only mildly imbalanced (37% vs 63%); with a much more skewed dataset the macro F1 would be noticeably lower than the accuracy.</p></details>
+</div>
+
+</article>
+<script src="../js/topics.js"></script>
+<script src="../js/lib/viz.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/pages/metrics.js"></script>
+</body>
+</html>

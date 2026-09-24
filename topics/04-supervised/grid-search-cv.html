@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid Search CV · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="grid">
+<article id="lesson">
+
+<h1>Grid Search CV</h1>
+<p class="lede">Every model in this course has knobs: the k in KNN, the C and γ of an SVM, the depth of a tree, the learning rate of boosting. Grid Search CV is the standard way to choose them: try many combinations, score each one fairly with cross-validation, and keep the best.</p>
+<div class="meta"><span class="chip">Essential skill</span><span class="chip plain">≈ 80 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: parameters vs hyperparameters</h2>
+<p>A model has two kinds of numbers. <strong>Parameters</strong> are <em>learned from the data</em> during training: the weights of a linear model, the split points of a tree. <strong>Hyperparameters</strong> are <em>chosen by you before training</em> and control how the learning happens: <code>n_neighbors</code>, <code>max_depth</code>, <code>C</code>, <code>learning_rate</code>, <code>n_estimators</code>, the regularisation strength α of Ridge and LASSO. The training algorithm cannot choose them for itself, because it would simply pick whatever memorises the training data best (a depth-unlimited tree, k = 1).</p>
+<div class="callout analogy"><p><strong>Tuning a radio.</strong> You turn two dials (frequency and fine-tune) and listen for the clearest sound. Trying every combination of dial positions systematically is a <em>grid search</em>. But you must judge "clear" fairly. If you tune while listening to the one song you will later be graded on, you will tune to that song's quirks. Cross-validation is the way of judging on songs the dials were not tuned on.</p></div>
+
+<h2>2. The fair judge: cross-validation</h2>
+<p>How do we score a setting honestly? Three tempting answers, and why each fails:</p>
+<div class="tw"><table>
+<tr><th>Idea</th><th>Problem</th></tr>
+<tr><td>Score on the training data</td><td>Rewards memorising. A depth-20 tree scores 100% and tells you nothing about new data.</td></tr>
+<tr><td>Score on the test set, pick the best</td><td>The test set has now been used to make a choice, so it no longer measures how the model does on genuinely unseen data. (This is called <em>leakage</em>.)</td></tr>
+<tr><td>Hold out one validation set</td><td>Fine, but wasteful and noisy: the result depends on which rows happened to land in it.</td></tr>
+</table></div>
+<p><strong>K-fold cross-validation</strong> fixes the last one. Split the training rows into K equal <em>folds</em>. Then K times: train on K − 1 folds, validate on the remaining fold. Every row is used for validation exactly once, and the K scores are averaged.</p>
+<div class="demo" data-title="How K-fold cuts the data" id="demo-folds">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Try "Rows: original order" with 2 folds. The data here is stored sorted by class (a common accident: think of a file sorted by date or by label), so one fold's training part contains a single class. That is why real code <strong>shuffles</strong> or uses <strong>stratified</strong> folds (each fold keeps the class proportions), which scikit-learn does automatically for classifiers when you pass <code>cv=5</code>.</p>
+
+<h3>By hand: choosing k for KNN with 5-fold CV</h3>
+<p>Ten points on a line, class 0 mostly on the left and class 1 mostly on the right, but with two "noisy" ones (x = 3.4 and x = 7.1). We use the KNN classifier from the earlier lesson and want to pick <code>n_neighbors</code> from {1, 3, 5}. The folds are the consecutive pairs (points 1-2, 3-4, 5-6, 7-8, 9-10).</p>
+<div class="tw"><table>
+<tr><th>Point</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">8</td><td class="num">9</td><td class="num">10</td></tr>
+<tr><th>x</th><td class="num">1.0</td><td class="num">1.7</td><td class="num">2.9</td><td class="num">3.4</td><td class="num">4.6</td><td class="num">5.2</td><td class="num">6.5</td><td class="num">7.1</td><td class="num">8.3</td><td class="num">9.0</td></tr>
+<tr><th>class</th><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Fold 1</strong> (validate points 1 and 2; train on points 3 to 10). With <b>k = 3</b>: point 1 (x = 1.0) has nearest training points 3, 4, 5 (classes 0, 1, 0) → vote 2 to 1 → predict 0 ✔. Point 2 has the same three neighbours → 0 ✔. Fold score = 2 ÷ 2 = <b>1.0</b>.</p>
+<p><strong>Fold 2</strong> (validate points 3 and 4; train on 1, 2, 5 to 10). Point 3 (x = 2.9): nearest are 2, 5, 1 (classes 0, 0, 0) → 0 ✔. Point 4 (x = 3.4, the noisy 1): nearest are 5, 2, 6 (classes 0, 0, 1) → 0 ✘. Score = <b>0.5</b>.</p>
+<p><strong>Fold 3</strong> (validate 5 and 6). Point 5 (x = 4.6, true class 0): nearest 4, 3, 7 (classes 1, 0, 1) → 1 ✘. Point 6 (x = 5.2): nearest 7, 4, 8 (1, 1, 0) → 1 ✔. Score = <b>0.5</b>.</p>
+<p><strong>Fold 4</strong> (validate 7 and 8). Point 7 (x = 6.5): nearest 6, 9, 5 (1, 1, 0) → 1 ✔. Point 8 (x = 7.1, the noisy 0): nearest 9, 6, 10 (1, 1, 1) → 1 ✘. Score = <b>0.5</b>.</p>
+<p><strong>Fold 5</strong> (validate 9 and 10). Point 9 (x = 8.3): nearest 8, 7, 6 (0, 1, 1) → 1 ✔. Point 10: nearest 8, 7, 6 → 1 ✔. Score = <b>1.0</b>.</p>
+<p>Mean for <b>k = 3</b> = (1.0 + 0.5 + 0.5 + 0.5 + 1.0) ÷ 5 = <b>0.70</b>.</p></div>
+<p>Repeating the same procedure for k = 1 and k = 5 gives:</p>
+<div class="tw"><table>
+<tr><th>n_neighbors</th><th class="num">fold 1</th><th class="num">fold 2</th><th class="num">fold 3</th><th class="num">fold 4</th><th class="num">fold 5</th><th class="num">mean CV accuracy</th></tr>
+<tr><td>1</td><td class="num">1.0</td><td class="num">0.5</td><td class="num">0.5</td><td class="num">0.5</td><td class="num">0.0</td><td class="num"><b>0.50</b></td></tr>
+<tr><td><b>3</b></td><td class="num">1.0</td><td class="num">0.5</td><td class="num">0.5</td><td class="num">0.5</td><td class="num">1.0</td><td class="num"><b>0.70</b> ★</td></tr>
+<tr><td>5</td><td class="num">0.0</td><td class="num">0.5</td><td class="num">1.0</td><td class="num">0.5</td><td class="num">1.0</td><td class="num"><b>0.60</b></td></tr>
+</table></div>
+<p>k = 1 chases each noisy point; k = 5 averages over too many neighbours (in fold 1 it looks at points from the far side and gets both wrong). <strong>k = 3 wins</strong>. Finally the search does one more thing: it <strong>refits</strong> KNN with k = 3 on <em>all ten</em> points, and that is the model you keep. (With only 10 points and 2 validation points per fold these scores are extremely noisy; this is a teaching-size example. Real data needs hundreds of rows to make the differences meaningful.)</p>
+
+<h2>3. Grid search: try every combination</h2>
+<p>Grid search is just this loop, run over a table of candidate values:</p>
+<ol>
+<li>List candidate values for each hyperparameter, e.g. <code>C ∈ {0.1, 1, 10, 100}</code> and <code>γ ∈ {scale, 0.001, 0.01, 0.1}</code>: the "grid" has 4 × 4 = <b>16 combinations</b>.</li>
+<li>For every combination, run K-fold cross-validation and record the mean score.</li>
+<li>Pick the combination with the best mean score.</li>
+<li><strong>Refit</strong> a final model on all the training data with those settings (scikit-learn does this automatically, <code>refit=True</code>).</li>
+</ol>
+<div class="callout math"><p><strong>Counting the work.</strong> Total model fits = (number of combinations) × K, plus one final refit. 16 combinations with 5 folds = <b>80 fits</b>. It multiplies quickly: 4 hyperparameters with 5 candidate values each = 5<sup>4</sup> = 625 combinations, and × 5 folds = <b>3,125 fits</b>. Grids blow up as you add hyperparameters ("the curse of the grid"), so use sensible, coarse grids first, then refine around the winner. Scale hyperparameters like C, γ, learning rate and α on a <b>logarithmic</b> grid (0.001, 0.01, 0.1, 1, 10...), because a change from 0.1 to 1 matters more than from 10.1 to 11.</p></div>
+<div class="demo" data-title="A grid, random search, and the optimism trap" id="demo-grid">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>The heat-map</strong> shows the 5-fold CV accuracy of a decision tree for every (max_depth, min_samples_leaf) pair. The pink frame marks the winner; click any cell to see its five fold scores and its training accuracy.</li>
+<li><strong>Switch to random search:</strong> only 10 of the 48 cells are tried (dashed cells are skipped), with 50 fits instead of 240. Press "New random tries" a few times: it often lands on a setting nearly as good as the grid's best.</li>
+<li><strong>Look at the test accuracy</strong> reported for the winner, and compare it with the untuned deep tree. With only 60 noisy rows, tuning often gains little or nothing over the default (the repeated experiment below shows this on average).</li>
+<li><strong>"Repeat on 20 fresh datasets"</strong> shows the optimism trap: the best CV score, averaged over many datasets, is higher than the accuracy the chosen setting actually delivers on new points, because the "best of 48" was picked partly by luck. That is why you keep a test set untouched, or use nested cross-validation (section 5).</li>
+</ul>
+<div class="demo" data-title="Reading a validation curve" id="demo-curve">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>training accuracy</span><span><i style="background:var(--c2)"></i>validation accuracy (band = ± 1 standard deviation across folds)</span><span>★ = best validation score</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>This is the picture behind every grid search, in one dimension: as the model gets more flexible, training accuracy keeps rising, while validation accuracy peaks and then falls. Grid search is finding the ★. With few rows the band is wide, so several depths are practically tied; prefer the simpler one.</p>
+
+<h2>4. Random search, halving and beyond</h2>
+<ul>
+<li><strong>Random search</strong> (<code>RandomizedSearchCV</code>): instead of every grid point, sample <code>n_iter</code> random combinations from ranges or distributions. You choose the budget. It is often nearly as good as a full grid for a fraction of the cost, because usually only one or two hyperparameters really matter, and random sampling tries many <em>different values</em> of each of them, where a grid keeps repeating the same few.</li>
+<li><strong>Successive halving</strong> (<code>HalvingGridSearchCV</code>): start every candidate on a small slice of the data, throw away the worse half, give the survivors more data, and repeat. It spends the budget on promising settings. (Experimental in scikit-learn: it needs <code>from sklearn.experimental import enable_halving_search_cv</code>.)</li>
+<li><strong>Smarter searches</strong> such as Bayesian optimisation (tools like Optuna) use the results so far to decide what to try next. Worth knowing they exist; the ideas of this lesson (CV, refit, test set) stay the same.</li>
+</ul>
+
+<h2>5. Traps to avoid</h2>
+<div class="callout warn"><ul>
+<li><strong>Leakage through preprocessing.</strong> If you scale (or impute, or select features) <em>before</em> cross-validation, the validation folds have influenced the statistics used on the training folds. Put the preprocessing <strong>inside a <code>Pipeline</code></strong> and pass the pipeline to <code>GridSearchCV</code>, so it is re-fitted on the training part of every fold. On the breast-cancer data below the leak happened to make no visible difference (both scored 0.9647), but with target encoding, feature selection or small datasets it can be large.</li>
+<li><strong>Optimistic <code>best_score_</code>.</strong> The winner's CV score is the best of many, as the demo showed. Report the score on a <strong>held-out test set</strong> that the search never saw, or use <strong>nested cross-validation</strong> (an outer CV that scores a whole grid search: <code>cross_val_score(GridSearchCV(...), X, y)</code>).</li>
+<li><strong>The wrong metric.</strong> The default score is accuracy for classifiers and R² for regressors. For imbalanced classes pass <code>scoring="f1"</code>, <code>"roc_auc"</code> or <code>"recall"</code> (see the ML Workflow lesson on metrics).</li>
+<li><strong>Unshuffled or unstratified folds</strong> on sorted data (the first demo).</li>
+<li><strong>Chasing tiny differences.</strong> A CV score of 0.912 ± 0.03 and one of 0.915 ± 0.03 are a tie. Prefer the simpler model.</li>
+<li><strong>Time series.</strong> Never shuffle across time; use <code>TimeSeriesSplit</code> so you always validate on the future.</li>
+</ul></div>
+
+<h2>6. Grid Search CV in scikit-learn</h2>
+<p>Our hand example first:</p>
+<pre class="code">
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import KFold, cross_val_score, GridSearchCV
+
+X = np.array([1.0, 1.7, 2.9, 3.4, 4.6, 5.2, 6.5, 7.1, 8.3, 9.0]).reshape(-1, 1)
+y = np.array([0, 0, 0, 1, 0, 1, 1, 0, 1, 1])
+
+for k in (1, 3, 5):
+    s = cross_val_score(KNeighborsClassifier(n_neighbors=k), X, y, cv=KFold(5))
+    print(k, s, s.mean())
+# 1 [1.  0.5 0.5 0.5 0. ] 0.5
+# 3 [1.  0.5 0.5 0.5 1. ] 0.7      &lt;- identical to our hand-made table
+# 5 [0.  0.5 1.  0.5 1. ] 0.6
+
+grid = GridSearchCV(KNeighborsClassifier(), {"n_neighbors": [1, 3, 5]}, cv=KFold(5)).fit(X, y)
+print(grid.best_params_, grid.best_score_)   # {'n_neighbors': 3} 0.7
+print(grid.predict([[5.0]]))                 # [1]  (the refit model, trained on all 10 points)
+</pre>
+<p>(<code>KFold(5)</code> without shuffling is used here so that the folds match our pairs. In everyday code, <code>cv=5</code> on a classifier uses stratified folds automatically.) Now a realistic example: an SVM in a pipeline, tuned on the breast-cancer data, with a test set that the search never touches. The comments are from an actual run with scikit-learn 1.9.0; other versions may differ slightly.</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+import pandas as pd
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+pipe = Pipeline([("scale", StandardScaler()), ("svm", SVC())])
+param_grid = {"svm__C": [0.1, 1, 10, 100],                 # step__parameter names
+              "svm__gamma": ["scale", 0.001, 0.01, 0.1]}
+
+search = GridSearchCV(pipe, param_grid, cv=5, n_jobs=-1, return_train_score=True)
+search.fit(X_train, y_train)          # 16 combinations x 5 folds = 80 fits, then 1 refit
+
+print(search.best_params_)            # {'svm__C': 10, 'svm__gamma': 0.001}
+print(search.best_score_)             # 0.9765  (mean CV accuracy of the winner)
+print(search.score(X_test, y_test))   # 0.979   (the refit model on the untouched test set)
+
+results = pd.DataFrame(search.cv_results_)
+cols = ["param_svm__C", "param_svm__gamma", "mean_test_score", "std_test_score", "mean_train_score"]
+print(results.sort_values("rank_test_score")[cols].head(3))
+#   C   gamma  mean_test  std_test  mean_train
+#  10   0.001   0.9765    0.0166    0.9806
+#   1   0.01    0.9718    0.0160    0.9789
+# 100   0.001   0.9695    0.0095    0.9842
+# (the worst combination, C=0.1 with gamma=0.001, scored only 0.709: badly under-fitted)
+</pre>
+<p>An honest observation from this run: the untuned <code>SVC()</code> in the same pipeline also scored <b>0.979</b> on the test set, so tuning did not improve the final number on this easy dataset. Its value here is <em>safety</em>: it protects you from a bad setting (a 0.709 combination sits in the same grid) and shows you the model is not fragile. On harder problems, or with boosting models, tuning usually matters more. Other search strategies, on the same data:</p>
+<pre class="code">
+from scipy.stats import loguniform
+from sklearn.model_selection import RandomizedSearchCV, cross_val_score, StratifiedKFold
+from sklearn.experimental import enable_halving_search_cv        # needed once
+from sklearn.model_selection import HalvingGridSearchCV
+
+rand = RandomizedSearchCV(pipe, {"svm__C": loguniform(1e-2, 1e3),
+                                 "svm__gamma": loguniform(1e-4, 1e0)},
+                          n_iter=12, cv=5, n_jobs=-1, random_state=0).fit(X_train, y_train)
+print(rand.best_score_, rand.score(X_test, y_test))   # 0.960  0.972   (12 x 5 = 60 fits)
+
+halving = HalvingGridSearchCV(pipe, param_grid, cv=5, random_state=0).fit(X_train, y_train)
+print(halving.best_params_, halving.score(X_test, y_test))   # C=1, gamma='scale'   0.979
+
+# nested CV: an honest estimate of "tuning + fitting" as one procedure
+outer = StratifiedKFold(5, shuffle=True, random_state=0)
+print(cross_val_score(GridSearchCV(pipe, param_grid, cv=5), X, y, cv=outer).mean())   # 0.979
+</pre>
+<p>Random search found a slightly weaker setting than the full grid (0.960 CV) with 60 instead of 80 fits: on a grid this small it saves little, but on grids with thousands of combinations the saving is what makes tuning affordable. Different search methods can pick different winners that perform almost equally well, another sign not to over-trust tiny differences.</p>
+<div class="tw"><table>
+<tr><th>Argument / attribute</th><th>What it does</th></tr>
+<tr><td><code>estimator</code></td><td>Any scikit-learn model or, best, a <code>Pipeline</code>.</td></tr>
+<tr><td><code>param_grid</code></td><td>Dictionary of hyperparameter name → list of candidate values (or a list of such dictionaries for separate grids). Pipeline parameters use <code>step__name</code>.</td></tr>
+<tr><td><code>cv</code></td><td>Number of folds (default 5), or a splitter such as <code>StratifiedKFold(5, shuffle=True, random_state=0)</code>, <code>RepeatedKFold</code> or <code>TimeSeriesSplit</code>.</td></tr>
+<tr><td><code>scoring</code></td><td>The metric to maximise: <code>"accuracy"</code>, <code>"f1"</code>, <code>"roc_auc"</code>, <code>"neg_mean_squared_error"</code>, ... or several at once (then <code>refit</code> must name one).</td></tr>
+<tr><td><code>refit=True</code></td><td>Retrain the best setting on all the data, available as <code>best_estimator_</code> and used by <code>predict</code>.</td></tr>
+<tr><td><code>n_jobs=-1</code></td><td>Run fits in parallel on all CPU cores: grid searches are embarrassingly parallel.</td></tr>
+<tr><td><code>return_train_score=True</code></td><td>Also record training scores in <code>cv_results_</code> so you can spot overfitting (train ≫ validation).</td></tr>
+<tr><td><code>best_params_</code>, <code>best_score_</code>, <code>best_estimator_</code>, <code>cv_results_</code></td><td>The winner, its mean CV score, the refitted model, and a full table of every combination (mean, std, rank, fit time).</td></tr>
+<tr><td><code>RandomizedSearchCV(n_iter=...)</code></td><td>Random sampling; give distributions such as <code>loguniform(1e-3, 1e2)</code>.</td></tr>
+</table></div>
+<p><strong>A practical recipe:</strong> (1) split off a test set and don't touch it; (2) build a pipeline with preprocessing and the model; (3) start with a coarse log-spaced grid or a random search; (4) look at <code>cv_results_</code>, especially the std and train-vs-validation gap; (5) refine around the best region; (6) evaluate <em>once</em> on the test set.</p>
+
+<h2>7. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Simple, systematic and reproducible; works with any model</td><td>Cost multiplies with every hyperparameter you add (the curse of the grid)</td></tr>
+<tr><td>Cross-validation makes efficient use of small datasets</td><td>The winner's CV score is optimistic; a separate test set or nested CV is needed</td></tr>
+<tr><td>Embarrassingly parallel (<code>n_jobs=-1</code>)</td><td>A grid can only pick from values you listed; the best value may lie between grid points</td></tr>
+<tr><td><code>cv_results_</code> shows how sensitive the model is to each setting</td><td>Not a substitute for good features and enough data</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🏆 Competition pipelines</h4><p>Every strong entry tunes its boosting and forest models with searches like these, judged by cross-validation on the training data.</p></div>
+<div class="card"><h4>🏥 Medical risk models</h4><p>Stratified folds keep the rare outcome in every fold; scoring by recall or AUC instead of accuracy.</p></div>
+<div class="card"><h4>🤖 AutoML tools</h4><p>Automated machine-learning systems are, at heart, large, smart searches over models and hyperparameters with cross-validation.</p></div>
+<div class="card"><h4>📈 Forecasting</h4><p>Time-series splits validate each candidate on data that comes after its training window, mimicking real deployment.</p></div>
+<div class="card"><h4>🧪 Model comparison</h4><p>Fair comparison of KNN vs SVM vs forest means tuning each one with the same CV procedure, then comparing on the same test set.</p></div>
+<div class="card"><h4>🚀 Before deployment</h4><p>The tuned pipeline (preprocessing plus model) is saved as one object and deployed, which is next in this course.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Parameters</strong> are learned; <strong>hyperparameters</strong> are chosen by you. Choose them by <em>validation</em> performance, never by training score or the test set.</li>
+<li><strong>K-fold CV:</strong> split into K folds, train on K − 1, validate on 1, repeat K times, average. Shuffle or stratify the folds.</li>
+<li><strong>Grid search</strong> = CV for every combination in a grid, then refit the winner on all training data. Cost = combinations × K (+ 1 refit): 16 × 5 = 80 fits in our SVM example.</li>
+<li>Use <strong>log-spaced grids</strong> for C, γ, learning rate, α; use <strong>random search</strong> or <strong>halving</strong> when the grid gets big.</li>
+<li>Put preprocessing inside a <strong>Pipeline</strong> to avoid leakage; judge the final model once on an untouched <strong>test set</strong> (or nested CV), because <code>best_score_</code> is optimistic.</li>
+<li>Look at the standard deviation and the train-vs-validation gap: tiny differences are ties, and the simpler model wins ties.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>You have 100 training rows and use 5-fold cross-validation. How many rows train and how many validate in each round? How many times is each row used for validation?</li>
+<li>You search <code>C ∈ {0.1, 1, 10}</code> and <code>γ ∈ {0.001, 0.01, 0.1, 1}</code> with <code>cv=5</code>. How many combinations, and how many model fits (including the final refit)? How many with <code>cv=10</code>?</li>
+<li>A model's five fold scores are 0.80, 0.90, 0.85, 0.75, 0.90. What is the mean? (Bonus: the standard deviation, about 0.058.)</li>
+<li>Model A scores 0.90 ± 0.02 and model B scores 0.91 ± 0.05 (mean ± std across folds). Which would you choose, and why?</li>
+<li>Bonus: run the SVM code above. Compare <code>best_score_</code> with the test score, and try <code>scoring="f1"</code>. Does the winner change?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Each round: <b>80</b> rows train, <b>20</b> validate. Each row validates <b>exactly once</b> (and trains in the other 4 rounds).</p>
+<p><b>2.</b> 3 × 4 = <b>12 combinations</b>. With cv = 5: 12 × 5 = 60 fits, +1 refit = <b>61</b>. With cv = 10: 12 × 10 = 120, +1 = <b>121</b>.</p>
+<p><b>3.</b> (0.80 + 0.90 + 0.85 + 0.75 + 0.90) ÷ 5 = 4.20 ÷ 5 = <b>0.84</b>. Deviations: −0.04, +0.06, +0.01, −0.09, +0.06; squares sum to 0.017; ÷ 5 = 0.0034; square root ≈ 0.058.</p>
+<p><b>4.</b> They are essentially tied (B's advantage of 0.01 is far smaller than its ± 0.05 spread). <b>Model A</b> is the safer choice: its score is more stable across folds. If B is also a more complex model, that is a second reason to prefer A.</p>
+<p><b>5.</b> The CV score and the test score are usually close but rarely identical (0.9765 vs 0.979 in my run). The best setting under a different metric can differ, which is why the metric should match your real goal.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/grid-search-cv.js"></script>
+</body>
+</html>

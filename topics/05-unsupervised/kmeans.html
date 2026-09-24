@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-Means · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="kmeans">
+<article id="lesson">
+
+<h1>K-Means Clustering</h1>
+<p class="lede">K-Means is the most widely used clustering algorithm, and it is delightfully simple: place k centres, let every point join its nearest centre, move each centre to the middle of its group, and repeat until nothing changes.</p>
+<div class="meta"><span class="chip">Beginner to intermediate</span><span class="chip plain">≈ 85 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: k centres that keep moving</h2>
+<div class="callout analogy"><p><strong>Opening k pizza shops.</strong> You want to serve a city with k = 3 shops. First you drop three shops at random spots. Every household orders from its <em>nearest</em> shop. Then each owner looks at the households they serve and <em>moves the shop to the middle of those homes</em> (the average location). Now some households are closer to a different shop, so they switch. Owners move again. After a few rounds nobody switches any more: each shop sits in the middle of its own neighbourhood. Those neighbourhoods are the clusters, and the shops are the <strong>centroids</strong>.</p></div>
+<h3>The algorithm (Lloyd's algorithm)</h3>
+<ol>
+<li><strong>Choose k</strong>, the number of clusters, and place k starting centroids (for example at k random data points).</li>
+<li><strong>Assign:</strong> give every point to its nearest centroid (usual straight-line distance).</li>
+<li><strong>Update:</strong> move each centroid to the <strong>mean</strong> of the points assigned to it (that is where the name "means" comes from).</li>
+<li>Repeat steps 2 and 3 until the assignments no longer change.</li>
+</ol>
+<p>What is it trying to achieve? It minimises the <strong>inertia</strong> (also called within-cluster sum of squares): the sum, over all points, of the <em>squared</em> distance from the point to its own centroid. Small inertia = tight clusters.</p>
+<div class="callout math"><p><strong>Why do both steps lower the inertia?</strong> The assign step gives each point the centroid that is closest to it, which can only shrink its squared distance. The update step moves each centroid to the mean of its points, and <em>the mean is the point that minimises the total squared distance to a group</em>. Quick check on the one-dimensional group 1, 3, 5: the centre 3 (the mean) gives (1−3)² + (3−3)² + (5−3)² = 4 + 0 + 4 = <b>8</b>; the centre 2 gives 1 + 1 + 9 = 11; the centre 4 gives 9 + 1 + 1 = 11. Since neither step can raise the inertia and there are only finitely many ways to assign points, the algorithm <strong>always stops</strong>. But it may stop at a <em>local</em> minimum rather than the best possible answer (section 4).</p></div>
+
+<h2>2. K-Means by hand</h2>
+<p>Seven points and k = 2. For the starting centroids we (unluckily) pick the points <b>A</b> and <b>D</b>. To compare distances it is enough to use <em>squared</em> distances (no square root needed, the order is the same).</p>
+<div class="tw"><table>
+<tr><th>Point</th><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td></tr>
+<tr><th>(x, y)</th><td class="num">(1, 1)</td><td class="num">(1.5, 2)</td><td class="num">(3, 4)</td><td class="num">(5, 7)</td><td class="num">(3.5, 5)</td><td class="num">(4.5, 5)</td><td class="num">(3.5, 4.5)</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Iteration 1: assign.</strong> Centroids: c₁ = (1, 1), c₂ = (5, 7). Squared distance of a point to a centroid = (gap in x)² + (gap in y)².</p>
+<div class="tw"><table>
+<tr><th>Point</th><th class="num">to c₁</th><th class="num">to c₂</th><th>Nearest</th></tr>
+<tr><td>A</td><td class="num">0</td><td class="num">52</td><td>c₁</td></tr>
+<tr><td>B</td><td class="num">1.25</td><td class="num">37.25</td><td>c₁</td></tr>
+<tr><td>C</td><td class="num">13</td><td class="num">13</td><td>tie → c₁ (the first)</td></tr>
+<tr><td>D</td><td class="num">52</td><td class="num">0</td><td>c₂</td></tr>
+<tr><td>E</td><td class="num">22.25</td><td class="num">6.25</td><td>c₂</td></tr>
+<tr><td>F</td><td class="num">28.25</td><td class="num">4.25</td><td>c₂</td></tr>
+<tr><td>G</td><td class="num">18.5</td><td class="num">8.5</td><td>c₂</td></tr>
+</table></div>
+<p>Inertia so far = 0 + 1.25 + 13 + 0 + 6.25 + 4.25 + 8.5 = <b>33.25</b>. <strong>Update:</strong> cluster 1 = {A, B, C} → new c₁ = ((1 + 1.5 + 3) ÷ 3, (1 + 2 + 4) ÷ 3) = <b>(1.83, 2.33)</b>. Cluster 2 = {D, E, F, G} → c₂ = ((5 + 3.5 + 4.5 + 3.5) ÷ 4, (7 + 5 + 5 + 4.5) ÷ 4) = <b>(4.125, 5.375)</b>. Inertia with the new centres = <b>12.21</b>.</p>
+<p><strong>Iteration 2: assign.</strong> With c₁ = (1.83, 2.33), c₂ = (4.125, 5.375): A: 2.47 vs 28.9 → c₁; B: 0.22 vs 18.3 → c₁; <b>C: 4.14 vs 3.16 → c₂</b> (C switches!); D: 31.8 vs 3.41 → c₂; E: 9.89 vs 0.53 → c₂; F: 14.2 vs 0.28 → c₂; G: 7.47 vs 1.16 → c₂. <strong>Update:</strong> cluster 1 = {A, B} → c₁ = <b>(1.25, 1.5)</b>; cluster 2 = {C, D, E, F, G} → c₂ = <b>(3.9, 5.1)</b>. Inertia = <b>8.525</b>.</p>
+<p><strong>Iteration 3: assign.</strong> Squared distances to (1.25, 1.5) and (3.9, 5.1): A 0.31 vs 25.2; B 0.31 vs 15.4; C 9.31 vs 2.02; D 44.3 vs 4.82; E 17.3 vs 0.17; F 22.8 vs 0.37; G 14.1 vs 0.52. The same assignments as before: <b>nothing changed, so the algorithm stops.</b></p></div>
+<p>Final answer: clusters <b>{A, B}</b> and <b>{C, D, E, F, G}</b>, centroids (1.25, 1.5) and (3.9, 5.1), inertia <b>8.525</b>. Inertia went 33.25 → 12.21 → 11.23 → 8.525: it only ever goes down. Now watch the same loop on a larger example, one step at a time:</p>
+<div class="demo" data-title="K-Means, step by step" id="demo-steps">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>Press <b>Step</b> repeatedly. Odd presses assign (points join a nearest diamond, and the coloured background shows each centroid's region), even presses move the diamonds to the group means.</li>
+<li>Use "New starting centroids" a few times with the same data: sometimes two diamonds start inside the same blob, and the algorithm needs more iterations or ends up with a worse answer.</li>
+<li>Click on the plot to <b>add a point</b> and press Step: the nearest centroid claims it and shifts slightly.</li>
+<li>Change k to 2 or 5: with k = 2 two real groups are merged; with 5 a real group is cut.</li>
+</ul>
+
+<h2>3. Choosing k</h2>
+<p>K-Means must be told k. Use the tools from the overview lesson: the <strong>elbow</strong> in the inertia curve and the <strong>silhouette score</strong>, plus domain knowledge ("marketing can only run four campaigns"). For the classic iris flower measurements, the inertia for k = 2, 3, 4, 5, 6 is 152.4, 78.9, 57.2, 46.5, 39.0 (I ran this): it falls by 73 from k = 2 to 3, but only by 22, 11 and 7 afterwards, so the elbow is at about k = 3, matching the three species.</p>
+
+<h2>4. Where you start matters: local minima and k-means++</h2>
+<p>K-Means is guaranteed to stop, but not to find the <em>best</em> clustering. From an unlucky start it can settle in a <strong>local minimum</strong>: for example one centroid stranded between two blobs while another blob is shared by two centroids. Two standard remedies:</p>
+<ul>
+<li><strong>Run it several times</strong> from different starts and keep the run with the lowest inertia (<code>n_init</code> in scikit-learn).</li>
+<li><strong>Start smarter with k-means++:</strong> pick the first centroid at random; pick each further centroid at random too, but with probability <em>proportional to the squared distance to the nearest centroid already chosen</em>. Far-away points are much more likely to be picked, so the starting centres are spread out.</li>
+</ul>
+<div class="callout math"><p><strong>k-means++ by hand.</strong> Suppose the first centroid is A = (1, 1). Squared distances from A to the other points and the resulting chance of being picked as the second centroid:</p>
+<div class="tw"><table>
+<tr><th>Point</th><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>total</td></tr>
+<tr><th>squared distance to A</th><td class="num">0</td><td class="num">1.25</td><td class="num">13</td><td class="num">52</td><td class="num">22.25</td><td class="num">28.25</td><td class="num">18.5</td><td class="num">135.25</td></tr>
+<tr><th>chance of being picked</th><td class="num">0%</td><td class="num">0.9%</td><td class="num">9.6%</td><td class="num"><b>38.4%</b></td><td class="num">16.5%</td><td class="num">20.9%</td><td class="num">13.7%</td><td class="num">100%</td></tr>
+</table></div>
+<p>The point that is farthest from A (D) is the most likely second centroid, and B, right next to A, is almost never chosen. (The answer is still random, so not always D.)</p></div>
+<p>The next demo runs K-Means 200 times from a single start each, with plain random starting points and with k-means++, and histograms the final inertia of each run. Bars on the left are the best solutions found.</p>
+<div class="demo" data-title="How often does a start get stuck?" id="demo-init">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>On real data the same effect appears. On the iris data with k = 3 and only one start per run, I found (200 runs with scikit-learn 1.9.0): with random starting points <b>78.5%</b> of the runs ended within 1% of the best inertia and <b>43 of 200</b> got stuck in a clearly worse solution (inertia about 143 to 146 instead of 78.9). With k-means++, <b>all 200</b> reached the best solution. This is why scikit-learn uses k-means++ by default.</p>
+
+<h2>5. What K-Means cannot do well</h2>
+<p>A K-Means cluster is <em>the set of points nearest to a centre</em>, so clusters are always roughly round, similar in size, and separated by straight boundaries halfway between centres. Whenever real groups are not like that, K-Means struggles:</p>
+<div class="demo" data-title="When the assumptions break" id="demo-limits">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="tw"><table>
+<tr><th>Problem</th><th>What happens</th><th>What to do</th></tr>
+<tr><td>Different sizes or spreads</td><td>Boundaries sit halfway between centres, so the wide cluster loses its edges</td><td>Gaussian mixture models (they learn each cluster's own spread)</td></tr>
+<tr><td>Outliers</td><td>The mean is dragged towards them; a centroid may be wasted on one</td><td>Remove or cap outliers first; use K-Medoids, or DBSCAN (labels them as noise)</td></tr>
+<tr><td>Curved or elongated clusters</td><td>Cut across the shape</td><td>DBSCAN or hierarchical clustering; or transform the features first</td></tr>
+<tr><td>Features in different units</td><td>The large-scale feature dominates</td><td><strong>Scale</strong> first (the overview lesson)</td></tr>
+<tr><td>Categorical features</td><td>The mean of a category is meaningless</td><td>K-Modes, or one-hot encode with care</td></tr>
+<tr><td>Many dimensions</td><td>All distances look alike, clusters blur</td><td>Reduce dimensions first (PCA, coming up)</td></tr>
+<tr><td>Huge datasets</td><td>Every iteration touches every point</td><td><code>MiniBatchKMeans</code>: updates from small random batches</td></tr>
+</table></div>
+
+<h2>6. K-Means in scikit-learn</h2>
+<p>Our seven points, starting from the same unlucky centroids, reproduce the hand calculation exactly:</p>
+<pre class="code">
+import numpy as np
+from sklearn.cluster import KMeans
+
+P = np.array([[1, 1], [1.5, 2], [3, 4], [5, 7], [3.5, 5], [4.5, 5], [3.5, 4.5]])
+
+km = KMeans(n_clusters=2, init=np.array([[1, 1], [5, 7]]), n_init=1).fit(P)
+print(km.labels_)             # [0 0 1 1 1 1 1]   -> {A, B} and {C, D, E, F, G}
+print(km.cluster_centers_)    # [[1.25 1.5 ] [3.9  5.1 ]]
+print(km.inertia_)            # 8.525
+print(km.n_iter_)             # 3   (the algorithm stopped in the third iteration, as in our table)
+
+print(km.predict([[2, 2], [4, 6]]))    # [0 1]     -> which cluster do new points fall in?
+print(km.transform([[2, 2]]))          # [[0.901 3.636]]   -> distance to each centroid
+</pre>
+<p>Iris flowers, scaling and starting points (the outputs are from an actual run with scikit-learn 1.9.0; other versions may differ slightly):</p>
+<pre class="code">
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import adjusted_rand_score, silhouette_score
+
+X, y = load_iris(return_X_y=True)
+
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
+print(km.inertia_)                              # 78.85
+print(adjusted_rand_score(y, km.labels_))       # 0.730   (agreement with the true species; the labels were NOT used to cluster)
+print(silhouette_score(X, km.labels_))          # 0.553
+
+Xs = StandardScaler().fit_transform(X)
+print(adjusted_rand_score(y, KMeans(3, n_init=10, random_state=0).fit_predict(Xs)))   # 0.620
+
+for k in range(2, 7):
+    print(k, KMeans(k, n_init=10, random_state=0).fit(X).inertia_)
+# 2 152.35 | 3 78.85 | 4 57.23 | 5 46.45 | 6 39.04     -> the elbow is around k = 3
+</pre>
+<p>Notice that <strong>scaling made the iris result worse</strong> here (ARI 0.73 → 0.62). All four iris measurements are in centimetres and of similar size, so scaling was not needed, and standardising boosts the influence of the least informative feature (sepal width). "Always scale" is a good default when units differ (as in the customer example), not a law.</p>
+<p>K-Means is also used for <strong>colour quantisation</strong>: cluster an image's pixels (each pixel is a point in red-green-blue space) into k colours, and redraw every pixel with its centroid's colour.</p>
+<pre class="code">
+from sklearn.datasets import load_sample_image
+
+img = load_sample_image("china.jpg")                # 427 x 640 pixels, bundled with scikit-learn (needs Pillow)
+pixels = (img / 255.0).reshape(-1, 3)
+sample = pixels[np.random.RandomState(0).choice(len(pixels), 10000, replace=False)]   # fit on a sample: faster
+
+for k in (4, 16, 64):
+    q = KMeans(k, n_init=1, random_state=0).fit(sample)
+    recon = q.cluster_centers_[q.predict(pixels)]   # every pixel replaced by its centroid colour
+    print(k, np.mean((pixels - recon) ** 2))
+# 4  colours: mean squared error 0.00702
+# 16 colours: mean squared error 0.00180
+# 64 colours: mean squared error 0.00060
+</pre>
+<p>The error keeps falling as k grows, as inertia always does. With 16 colours each pixel needs only 4 bits (log₂ 16) instead of 24, six times less, plus a tiny palette. (I measured the errors; I did not view the resulting pictures.)</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>n_clusters</code></td><td>k. The one number you must choose.</td></tr>
+<tr><td><code>init</code></td><td><code>"k-means++"</code> (default), <code>"random"</code>, or an array of starting centroids.</td></tr>
+<tr><td><code>n_init</code></td><td>Number of restarts; the best inertia wins. Default <code>"auto"</code>: 1 with k-means++, 10 with random starts.</td></tr>
+<tr><td><code>max_iter</code>, <code>tol</code></td><td>Maximum iterations (default 300) and the tolerance for stopping early.</td></tr>
+<tr><td><code>random_state</code></td><td>Makes the random starts reproducible.</td></tr>
+<tr><td><code>labels_</code>, <code>cluster_centers_</code>, <code>inertia_</code>, <code>n_iter_</code></td><td>Results after <code>fit</code>: each point's cluster, the centroids, the inertia and the number of iterations used.</td></tr>
+<tr><td><code>predict</code>, <code>transform</code></td><td>Cluster of new points; distances of new points to every centroid (handy as new features).</td></tr>
+<tr><td><code>MiniBatchKMeans</code></td><td>Much faster on huge data, at a small cost in quality and with slightly different results.</td></tr>
+</table></div>
+
+<h2>7. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Simple to explain, implement and use; a strong first baseline</td><td>You must choose k</td></tr>
+<tr><td>Fast and scalable to millions of points (and <code>MiniBatchKMeans</code> for more)</td><td>Assumes round, similar-sized clusters; sensitive to outliers and scaling</td></tr>
+<tr><td>Centroids are easy to interpret ("the average customer in each segment")</td><td>Can end in a local minimum; needs k-means++ and several restarts</td></tr>
+<tr><td>Provides <code>predict</code> for new data</td><td>Hard assignment only: no idea how sure a point's membership is</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🛍️ Customer segmentation</h4><p>Cluster customers on spend, frequency and recency, and profile each centroid as a segment.</p></div>
+<div class="card"><h4>🎨 Colour quantisation</h4><p>Compress images or build colour palettes: the centroids are the palette.</p></div>
+<div class="card"><h4>📰 Grouping documents</h4><p>Cluster text represented as numbers (such as TF-IDF vectors) to discover topics.</p></div>
+<div class="card"><h4>🎧 Vector quantisation</h4><p>Audio and image codecs, and "visual vocabularies" in classic computer vision, store the nearest centroid instead of the raw vector.</p></div>
+<div class="card"><h4>📍 Facility placement</h4><p>Where to place depots, cell towers or bike stations so that everyone is near one: the pizza-shop problem, literally.</p></div>
+<div class="card"><h4>🧩 Feature engineering</h4><p>Use "which cluster" or "distance to each centroid" (<code>transform</code>) as extra features for a supervised model.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>K-Means repeats <strong>assign</strong> (each point to its nearest centroid) and <strong>update</strong> (each centroid to the mean of its points) until nothing changes.</li>
+<li>It minimises the <strong>inertia</strong>, the total squared distance to the assigned centroid. In our example: 33.25 → 12.21 → 11.23 → 8.525 in three iterations.</li>
+<li>It always stops, but possibly at a <strong>local minimum</strong>: use <strong>k-means++</strong> starts (on iris, random starts got stuck in 43 of 200 runs, k-means++ in none) and several restarts.</li>
+<li>Choose k with the elbow, the silhouette and domain knowledge. Inertia alone always prefers a larger k.</li>
+<li>It assumes round, similar-sized clusters: it struggles with different sizes or spreads, outliers and curved or elongated shapes. Scale features whose units differ.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>One-dimensional points 2, 4 and 10, starting centroids 3 and 9. Do one full iteration: which points go to which centroid, and where are the new centroids?</li>
+<li>A cluster contains the points 1, 2 and 6. What is its centroid and its inertia?</li>
+<li>Why can't you choose k by picking the k with the smallest inertia?</li>
+<li>k-means++ has chosen (0, 0) as the first centroid. Three other points lie at squared distances 1, 4 and 25 from it. What is the chance that each is picked as the second centroid?</li>
+<li>Bonus: on the iris data run <code>KMeans(3, init="random", n_init=1, random_state=s)</code> for s = 0 to 20. How many different inertia values do you see?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Point 2 is 1 from centroid 3 and 7 from 9 → centroid 3. Point 4: 1 from 3, 5 from 9 → centroid 3. Point 10: 7 from 3, 1 from 9 → centroid 9. New centroids: (2 + 4) ÷ 2 = <b>3</b> and <b>10</b>. (The first centroid did not move; the second moved from 9 to 10. The next iteration changes nothing, so it stops.)</p>
+<p><b>2.</b> Centroid = (1 + 2 + 6) ÷ 3 = <b>3</b>. Inertia = (1−3)² + (2−3)² + (6−3)² = 4 + 1 + 9 = <b>14</b>.</p>
+<p><b>3.</b> Inertia never increases as k grows, and reaches 0 when k equals the number of points (every point its own cluster). So it always "prefers" more clusters; you must look for the elbow or use another measure such as the silhouette.</p>
+<p><b>4.</b> The total is 1 + 4 + 25 = 30, so the chances are 1 ÷ 30 = <b>3.3%</b>, 4 ÷ 30 = <b>13.3%</b> and 25 ÷ 30 = <b>83.3%</b>.</p>
+<p><b>5.</b> Expect a few clearly different values: most runs give about 78.85 (or 78.86), while some get stuck at a much higher value (around 142 to 146). In my 200-run experiment about one run in five got stuck. With only 21 runs you might see between about 2 and 5 distinct values.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/kmeans.js"></script>
+</body>
+</html>

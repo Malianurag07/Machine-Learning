@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model-Free RL · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="mfree">
+<article id="lesson">
+
+<h1>Reinforcement Learning: Model-Free Methods</h1>
+<p class="lede">Last lesson, the agent had a map: the rules of the world (the model), so it could plan by calculation. Usually there is no map. Model-free methods learn <strong>directly from experience</strong>: try things, see what happens, and adjust estimates of how good each situation and action is, without ever writing down how the world works. This lesson covers the four core ideas: exploration, Monte Carlo, temporal-difference learning, and the two famous control algorithms, SARSA and Q-learning.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 100 min</span><span class="chip plain">4 interactive demos</span></div>
+<div class="callout tip"><p><strong>Recap you need.</strong> An agent takes actions in states and receives rewards; a policy maps states to actions; the return is the discounted sum of rewards (γ = discount); V(s) is the expected return from a state and Q(s, a) the expected return after taking action a in s (then continuing sensibly). If any of that is unfamiliar, read the previous lesson first.</p></div>
+
+<h2>1. The big idea: learn by doing</h2>
+<div class="callout analogy"><p><strong>The food critic in a new town.</strong> You have just moved and want to eat well. You have no reviews (no model). Each evening you pick a restaurant, eat, and note how good it was. Do you go back to the place you liked last week (<em>exploit</em>), or try somewhere new that might be even better (<em>explore</em>)? And when a great meal follows a mediocre starter, how do you split the credit? Model-free RL answers exactly these two questions: <em>how to keep score from experience</em>, and <em>how to balance trying new things with using what you know</em>.</p></div>
+<p>Two tasks come up again and again:</p>
+<ul>
+<li><strong>Prediction:</strong> given a fixed policy, estimate its values V(s). ("How good is this way of behaving?")</li>
+<li><strong>Control:</strong> find the best policy. ("What should I do?") Usually by learning Q(s, a) and acting greedily on it.</li>
+</ul>
+
+<h2>2. Exploration versus exploitation</h2>
+<p>If the agent always does what currently looks best, it may never discover something better. If it always tries random things, it never profits from what it has learned. The simplest compromise is <strong>ε-greedy</strong>:</p>
+<div class="callout math"><p>With probability <b>1 − ε</b> take the action with the highest estimated value (<em>exploit</em>); with probability <b>ε</b> take a random action (<em>explore</em>). Typical ε is 0.05 to 0.1, often decreasing over time.</p></div>
+<p>The cleanest place to see this is the <strong>multi-armed bandit</strong>: a row of slot machines ("arms") with different, unknown average payouts. After each pull the agent updates its estimate of that arm as the running average of what it received: Q ← Q + (reward − Q) ÷ (number of pulls). Try it:</p>
+<div class="demo" data-title="Which slot machine? Exploring vs exploiting" id="demo-bandit">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>A bigger experiment, the standard "10-armed testbed" (2,000 random bandits with 10 arms each, 1,000 pulls per bandit; a run of my own code): pure greedy (ε = 0) earned on average <b>1.04</b> per pull, ε = 0.01 earned <b>1.20</b> and ε = 0.1 earned <b>1.31</b>. In the last 100 pulls the greedy agent picked the best arm only <b>37%</b> of the time, ε = 0.01 chose it <b>58%</b> and ε = 0.1 chose it <b>80%</b>. Greed gets stuck on whichever arm looked good first; a little exploration pays off handsomely.</p>
+
+<h2>3. Monte Carlo: average what actually happened</h2>
+<p>The simplest way to estimate a state's value is to <em>observe</em> it. Play a full episode, compute the return that followed each state, and average those returns over many episodes. "Monte Carlo" just means learning from random samples. No model, no bootstrapping: only real, complete outcomes.</p>
+<h3>By hand: the corridor again</h3>
+<p>The corridor from last lesson: <b>[small prize 5] – s1 – s2 – s3 – [big prize 10]</b>. The robot tries to move right; with probability 0.8 it goes right and with probability 0.2 it slips left. In this lesson we use the plain convention <b>reward = −1 per move, plus the prize when a prize cell is entered</b> (so the final step into the big prize pays −1 + 10 = <b>+9</b>), and γ = 0.9. Two episodes were observed:</p>
+<div class="callout math">
+<p><b>Episode A</b> (starting at s2): s2 → s3 (reward −1), s3 → big prize (+9). The returns: from s3: <b>9</b>. From s2: −1 + 0.9 × 9 = <b>7.1</b>.</p>
+<p><b>Episode B</b> (starting at s2): s2 → s3 (−1), s3 slips → s2 (−1), s2 → s3 (−1), s3 → big prize (+9). The first visit to s2: −1 + 0.9 × (−1) + 0.81 × (−1) + 0.729 × 9 = −2.71 + 6.561 = <b>3.851</b>. The first visit to s3: −1 + 0.9 × (−1) + 0.81 × 9 = <b>5.39</b>.</p>
+<p><b>Averages so far</b> (first-visit Monte Carlo): V(s2) ≈ (7.1 + 3.851) ÷ 2 = <b>5.48</b>; V(s3) ≈ (9 + 5.39) ÷ 2 = <b>7.20</b>. The true values for this policy (found by solving the equations with the full model, which the learner does <em>not</em> have) are 5.454 and 7.982. With just two episodes the estimates are already in the right neighbourhood, and they get better as more episodes are averaged.</p></div>
+<p><strong>Properties.</strong> Monte Carlo estimates are <em>unbiased</em> (they average real returns), but they are <em>noisy</em> (a return depends on many random events) and they can only be updated <em>after an episode ends</em>. They do not work for tasks that never end.</p>
+
+<h2>4. Temporal-difference (TD) learning: learn a little at every step</h2>
+<p>TD learning is the central idea of modern RL. Instead of waiting for the end of the episode, update after <em>every single step</em>, using your own current estimate of the next state as part of the target. The estimate of s is nudged towards <b>reward + γ × (estimate of the next state)</b>:</p>
+<div class="callout math"><p style="text-align:center"><b>V(s) ← V(s) + α × [ r + γ V(s′) − V(s) ]</b></p>
+<p>The bracket is the <strong>TD error</strong> δ: "what I just saw (the reward plus what I now think the next state is worth) minus what I used to think this state was worth". The learning rate α (between 0 and 1) says how far to move towards the new evidence. When the next state is terminal, V(s′) = 0.</p></div>
+<p>Using an estimate to update another estimate is called <strong>bootstrapping</strong>. It means information travels backward through the states as the values improve, exactly like the sweeps of value iteration, but driven by real samples instead of a model.</p>
+<h3>By hand: three steps of TD on the corridor</h3>
+<p>Start with all values 0, α = 0.5, γ = 0.9, and take the moves from episode B in order: (s3 → s2, reward −1), (s2 → s3, reward −1), (s3 → big prize, reward +9).</p>
+<div class="callout math">
+<p><b>Step 1.</b> s3 → s2, reward −1: δ = −1 + 0.9 × V(s2) − V(s3) = −1 + 0 − 0 = −1, so V(s3) ← 0 + 0.5 × (−1) = <b>−0.5</b>.</p>
+<p><b>Step 2.</b> s2 → s3, reward −1: δ = −1 + 0.9 × V(s3) − V(s2) = −1 + 0.9 × (−0.5) − 0 = −1.45, so V(s2) ← 0 + 0.5 × (−1.45) = <b>−0.725</b>.</p>
+<p><b>Step 3.</b> s3 → prize, reward +9, terminal: δ = 9 + 0 − V(s3) = 9 − (−0.5) = 9.5, so V(s3) ← −0.5 + 0.5 × 9.5 = <b>4.25</b>.</p>
+<p>Notice that a single big surprise (the +9) immediately raised V(s3) from −0.5 to 4.25. In the next pass through s2 → s3 that good news will flow one step back into V(s2). Monte Carlo would have had to wait for the whole episode to finish before learning anything.</p></div>
+<div class="tw"><table>
+<tr><th></th><th>Monte Carlo</th><th>TD(0)</th></tr>
+<tr><td>Updates</td><td>after each complete episode</td><td>after each single step</td></tr>
+<tr><td>Target</td><td>the real return G (all rewards to the end)</td><td>r + γ V(s′): one real reward + an estimate</td></tr>
+<tr><td>Bias</td><td>none</td><td>some (the target uses estimates that may be wrong), fading as learning proceeds</td></tr>
+<tr><td>Variance</td><td>high (many random events in one return)</td><td>lower (only one step of randomness)</td></tr>
+<tr><td>Works on endless tasks</td><td>no</td><td>yes</td></tr>
+</table></div>
+<p>The next chart compares them on the corridor with the "always go right" policy. Each line is the average, over 30 independent runs, of the error of the value estimates compared with the true values (computed with the model, for reference only). There are three lines: Monte Carlo with the plain sample average (blue), Monte Carlo with the same constant learning rate α as TD (green), and TD(0) (pink). Change α. What I saw: for α of 0.2 or more, TD ends up with a clearly lower error than constant-α Monte Carlo (the less noisy update wins); with a small α both are slow, because they start from a guess of 0. And on this tiny problem the sample-average Monte Carlo (α = 1 ÷ visits) is hard to beat: don't expect TD to win everywhere. Its real advantage is that it works online, step by step, in long or endless tasks where Monte Carlo cannot even start updating.</p>
+<div class="demo" data-title="Monte Carlo vs TD: how fast do the estimates improve?" id="demo-td">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>5. Control: SARSA and Q-learning</h2>
+<p>To <em>choose</em> actions we learn action values Q(s, a) instead of V(s). The agent acts ε-greedily on its current Q (mostly best action, sometimes random) and after each step applies a TD update to the value of the pair it just tried. There are two classic versions, which differ in one term.</p>
+<div class="callout math">
+<p><strong>SARSA</strong> (named after the quintuple s, a, r, s′, a′ it uses):</p>
+<p style="text-align:center"><b>Q(s, a) ← Q(s, a) + α × [ r + γ × Q(s′, a′) − Q(s, a) ]</b></p>
+<p>where a′ is the action the agent <em>actually takes next</em> (including a random exploratory one). It learns the value of the policy it is actually following, mistakes and all: it is <strong>on-policy</strong>.</p>
+<p><strong>Q-learning:</strong></p>
+<p style="text-align:center"><b>Q(s, a) ← Q(s, a) + α × [ r + γ × max<sub>a′</sub> Q(s′, a′) − Q(s, a) ]</b></p>
+<p>It always assumes the <em>best</em> next action, whatever the agent really does next. It learns the value of the <em>greedy</em> policy while behaving in a different, exploring way: it is <strong>off-policy</strong>, and it converges towards the optimal Q* (given enough exploration and a suitable learning rate).</p></div>
+<p><strong>The one-term difference in numbers.</strong> Suppose the agent moves from s2 to s3 (reward −1) and, at s3, knows Q(s3, right) = 4.25 but happens to explore and pick "left", where Q(s3, left) = 0.8. With γ = 0.9: the SARSA target is −1 + 0.9 × 0.8 = <b>−0.28</b> (it credits what really happened next), while the Q-learning target is −1 + 0.9 × 4.25 = <b>2.83</b> (it credits the best that could have happened).</p>
+<h3>By hand: Q-learning on the same three moves</h3>
+<div class="callout math">
+<p>All Q-values start at 0, α = 0.5, γ = 0.9, terminal states have value 0.</p>
+<p><b>1.</b> (s3, right) gives −1 and lands in s2: Q(s3, right) ← 0 + 0.5 × [−1 + 0.9 × max Q(s2, ·) − 0] = 0.5 × (−1 + 0) = <b>−0.5</b>.</p>
+<p><b>2.</b> (s2, right) gives −1 and lands in s3: the best known value at s3 is max(Q(s3, left) = 0, Q(s3, right) = −0.5) = 0, so Q(s2, right) ← 0.5 × (−1 + 0.9 × 0 − 0) = <b>−0.5</b>.</p>
+<p><b>3.</b> (s3, right) gives +9 and ends: Q(s3, right) ← −0.5 + 0.5 × [9 + 0 − (−0.5)] = −0.5 + 4.75 = <b>4.25</b>.</p></div>
+<p>Do it on a 3-state robot and you would call it a toy; do it on a table with thousands of entries, repeated for millions of steps, and you have an agent that learns to play games.</p>
+
+<h2>6. The cliff: on-policy vs off-policy in practice</h2>
+<p>The classic experiment: a 4 × 12 grid. Start at the bottom left, goal at the bottom right, and between them a <b>cliff</b>: stepping on it costs −100 and sends the agent back to the start. Every other step costs −1. The shortest path runs right along the edge of the cliff. With ε-greedy exploration (ε = 0.1), an agent walking along the edge will occasionally take a random step off it.</p>
+<div class="demo" data-title="Cliff walking: Q-learning vs SARSA" id="demo-cliff">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The two algorithms learn different things: <strong>Q-learning</strong> learns the best <em>path</em> (the edge route, 13 steps: what you would do if you could stop exploring); <strong>SARSA</strong> learns the best <em>behaviour given that it explores</em>: it keeps a safe distance from the edge, because SARSA's values include the cost of its own random slips. So while learning, SARSA falls less and earns more reward; if you switch exploration off afterwards, Q-learning's path is better. Neither is "right": it depends on whether the reward during learning matters (a robot that can break) or only the final policy (a simulation).</p>
+<p>I also ran this with the real Gymnasium <code>CliffWalking</code> environment (500 episodes, ε = 0.1, α = 0.5, 10 different random seeds): Q-learning's average online reward over episodes 100 to 500 was <b>−49.8</b> and its greedy path was the 13-step edge route in all 10 runs. SARSA's was <b>−27.2</b>, with a greedy path of 17 steps in 7 of 10 runs (19 in one). One thing I did not expect: in 2 of the 10 SARSA runs the final greedy path did not reach the goal within 100 steps (it got stuck going back and forth), a reminder that a table learned with exploration in it can behave oddly when you suddenly turn exploration off.</p>
+
+<h2>7. Model-free reaches the planner's answer, but slowly</h2>
+<p>How does Q-learning compare with planning? Here it learns the 4 × 3 slippery gridworld of the last lesson (each move slips sideways 20% of the time) knowing nothing about the slip probabilities. The small grey numbers in brackets are the values the planner computed from the full model (the classic 0.812, 0.868, ...):</p>
+<div class="demo" data-title="Q-learning discovers the planner's values" id="demo-gridq">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Press "Train +2000 episodes" a few times (the defaults are a small learning rate, α = 0.05, and heavy exploration, ε = 0.5: Q-learning is off-policy, so it can explore a lot and still learn the values of the best policy). After 10,000 episodes the largest gap to the planner's values was between 0.03 and 0.12 in my runs, and the greedy arrows match the planner's. It needed thousands of episodes of real (here, simulated) experience where value iteration needed 28 quick sweeps: <strong>this is the price of not having a model</strong>. In exchange, model-free methods need no model at all, work when the model is too complicated to write down, and are the basis of most modern deep RL.</p>
+
+<h2>8. Model-free RL in Python</h2>
+<p>Everything above fits in a few lines with <code>gymnasium</code> (<code>pip install gymnasium</code>). This is Q-learning and SARSA on the slippery FrozenLake from last lesson, where the planner (with the model) achieved 74.8% success. All results are from an actual run (gymnasium 1.3.0, one run per setting, so expect some variation):</p>
+<pre class="code">
+import numpy as np, gymnasium as gym
+
+env = gym.make("FrozenLake-v1", is_slippery=True)
+rng = np.random.RandomState(0)
+Q = np.zeros((16, 4))                                  # a table: 16 states x 4 actions
+alpha, gamma, episodes = 0.1, 0.99, 30000
+
+for ep in range(episodes):
+    eps = max(0.05, 1.0 - ep / (0.6 * episodes))       # explore a lot at first, then less
+    s, _ = env.reset(); done = False
+    a = rng.randint(4) if rng.rand() &lt; eps else int(Q[s].argmax())
+    while not done:
+        s2, r, terminated, truncated, _ = env.step(a); done = terminated or truncated
+        a2 = rng.randint(4) if rng.rand() &lt; eps else int(Q[s2].argmax())
+        target = r + (0 if terminated else gamma * Q[s2].max())     # Q-learning: best next action
+        # target = r + (0 if terminated else gamma * Q[s2, a2])     # SARSA: the action actually chosen next
+        Q[s, a] += alpha * (target - Q[s, a])
+        s, a = s2, a2
+
+# evaluate the greedy policy (always take the best action) in the real environment:
+#   Q-learning, 30,000 episodes: 74.1% success   SARSA, 30,000 episodes: 74.0%
+#   Q-learning after only 10,000 episodes: 73.6% after 2,000 episodes: 73.7%
+# for comparison: random actions 1.3%, the planner with the full model 74.8% (100-step limit)
+</pre>
+<p>The model-free agent matches the planner's success rate, from experience alone: about 74%. (Its estimates of the exact values keep wobbling with a constant α, but the greedy policy is what counts here.) For the cliff, replace the environment name by <code>"CliffWalking-v1"</code> (with 48 states) and use ε = 0.1, α = 0.5, γ = 1 to reproduce the numbers above.</p>
+<div class="tw"><table>
+<tr><th>Ingredient</th><th>Role and typical values</th></tr>
+<tr><td>Learning rate α</td><td>How far each update moves the estimate. Large: fast but noisy; small: stable but slow. Often 0.05 to 0.5 for tables (or decayed over time).</td></tr>
+<tr><td>Discount γ</td><td>How far-sighted (0.9 to 0.999 in practice; 1 only when episodes surely end).</td></tr>
+<tr><td>Exploration ε</td><td>Often starts near 1 and decays to 0.05 or 0.01; other strategies exist (softmax, optimism, curiosity bonuses).</td></tr>
+<tr><td>Number of episodes</td><td>Tables need visits to every (state, action) pair many times: thousands to millions.</td></tr>
+<tr><td>Beyond tables</td><td>When there are too many states (images, continuous values), Q is represented by a neural network (Deep Q-Networks, DQN), or the policy itself is learned directly (policy gradients, actor-critic). I only mention these here; they are the next steps after this lesson. Libraries such as Stable-Baselines3 package them (I have not run them in this course).</td></tr>
+</table></div>
+
+<h2>9. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Needs no model of the environment</td><td>Sample-hungry: often needs huge amounts of experience</td></tr>
+<tr><td>Simple updates, easy to implement</td><td>Exploration is hard in big worlds; rewards can be rare (sparse) and delayed</td></tr>
+<tr><td>Learns from a stream of experience, online</td><td>Tables do not scale; function approximation can be unstable</td></tr>
+<tr><td>Foundation of deep RL: the same ideas play video games, control robots and more</td><td>Mistakes during exploration can be costly in the real world (safety)</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🎮 Video games</h4><p>Deep Q-learning agents learned to play dozens of arcade games from raw pixels and the score alone.</p></div>
+<div class="card"><h4>🤖 Robot skills</h4><p>Walking, grasping and balancing are learned in simulation and then refined on real robots.</p></div>
+<div class="card"><h4>📺 Recommendation and ads</h4><p>Each recommendation is an action, clicks and watch time are rewards: bandit and RL methods choose what to show.</p></div>
+<div class="card"><h4>🧊 Data-centre cooling and energy</h4><p>Controlling fans and chillers to save energy, learned from experience with the plant's own sensors.</p></div>
+<div class="card"><h4>💹 Trading and logistics</h4><p>Order execution, inventory and routing under uncertainty (with great care about safety and cost of mistakes).</p></div>
+<div class="card"><h4>💬 Fine-tuning language models</h4><p>Rewards from human feedback are used to steer conversational models: RL applied to text.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Model-free</strong> RL learns values or policies straight from experience, with no model of the transitions or rewards.</li>
+<li><strong>ε-greedy</strong> balances exploring and exploiting. On the 10-armed testbed, ε = 0.1 earned 1.31 per pull versus 1.04 for pure greed.</li>
+<li><strong>Monte Carlo</strong>: average the full returns of complete episodes (unbiased, noisy, waits for the end). <strong>TD</strong>: V(s) ← V(s) + α [r + γ V(s′) − V(s)], update every step, bootstrapping (low variance, some bias). One TD step on the corridor took V(s3) from −0.5 to 4.25.</li>
+<li><strong>SARSA</strong> (on-policy): target r + γ Q(s′, a′) with the action actually taken. <strong>Q-learning</strong> (off-policy): target r + γ max Q(s′, ·). On the cliff, Q-learning finds the optimal edge path but earns less while learning (−49.8 vs −27.2); SARSA learns a safer path.</li>
+<li>Q-learning on slippery FrozenLake reached about 74% success without a model, the same as the planner with the model, but needed tens of thousands of steps.</li>
+<li>Tables do not scale; neural networks replace them in deep RL.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>Compute the return of the rewards −1, −1, +9 with γ = 0.9.</li>
+<li>TD update: V(s) = 2, the agent gets reward −1 and lands in s′ with V(s′) = 4; α = 0.5, γ = 0.9. What is the TD error and the new V(s)?</li>
+<li>At the next state, Q(s′, best action) = 6 while the exploring agent actually takes an action with Q = 1. The reward was 0 and γ = 1. What are the SARSA and Q-learning targets?</li>
+<li>Why does SARSA earn more reward than Q-learning <em>during</em> cliff-walking training, while Q-learning finds the shorter path?</li>
+<li>Bonus: in the bandit demo, set ε = 0, pull 1000 times on several "New bandit" settings, and reveal the truth. How often did the greedy agent end up on the best arm?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> G = −1 + 0.9 × (−1) + 0.81 × 9 = −1 − 0.9 + 7.29 = <b>5.39</b>.</p>
+<p><b>2.</b> Target = −1 + 0.9 × 4 = 2.6; TD error δ = 2.6 − 2 = <b>0.6</b>; new V(s) = 2 + 0.5 × 0.6 = <b>2.3</b>.</p>
+<p><b>3.</b> SARSA: 0 + 1 × 1 = <b>1</b> (it uses the action actually taken). Q-learning: 0 + 1 × 6 = <b>6</b> (it uses the best action).</p>
+<p><b>4.</b> SARSA's values include the cost of its own exploratory slips, so walking along the cliff edge looks dangerous to it and it prefers a safe detour: it falls rarely and earns more while it is still exploring. Q-learning's values assume the greedy action will be taken next, so the edge looks fine (the shortest path), but since the agent really does explore, it sometimes falls off. Without exploration Q-learning's path is the better one.</p>
+<p><b>5.</b> It depends on the bandit: often the greedy agent settles on a suboptimal arm (in my 10-armed experiment it picked the best arm only 37% of the time late in the run). Try several bandits; the number will vary.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/model-free.js"></script>
+</body>
+</html>

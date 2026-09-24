@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-Nearest Neighbors · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="knn">
+<article id="lesson">
+
+<h1>K-Nearest Neighbors (KNN)</h1>
+<p class="lede">KNN makes a prediction by asking a simple question: <em>which K known examples look most like this new one?</em> Then it lets them vote. There is no training phase and almost no math beyond measuring distance.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 80 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. The big idea</h2>
+<div class="callout analogy"><p><strong>New in town.</strong> You move to a new neighbourhood and want to know if a restaurant is any good. You don't compute anything: you ask the <em>K people who live closest to you</em> and go with the majority. Or you want to guess the rent of a flat: look at the K most similar flats nearby and average their rents. "You are like your closest neighbours" is the whole algorithm.</p></div>
+<ol class="steps">
+<li><strong>Store</strong> all the labelled examples. (That is the entire "training".)</li>
+<li>For a new point, <strong>measure its distance</strong> to every stored example.</li>
+<li>Pick the <strong>K closest</strong> ones (the neighbours).</li>
+<li><strong>Classification:</strong> the neighbours vote and the majority class wins. <strong>Regression:</strong> predict the average of the neighbours' values.</li>
+</ol>
+<p>KNN is called a <strong>lazy learner</strong> (or instance-based learner): it does no work when you "train" it, it just memorises the data, and does all the work at prediction time. It is also <strong>non-parametric</strong>: there are no weights θ to learn, and the decision boundary can take any shape.</p>
+
+<h2>2. Measuring "close": distance</h2>
+<p>To find neighbours we need a number for how far apart two points are. With features (x₁, x₂) for point A and (y₁, y₂) for point B:</p>
+<div class="tw"><table>
+<tr><th>Distance</th><th>In words</th><th>Formula for 2 features</th><th>Example A = (4, 4), B = (1, 6)</th></tr>
+<tr><td><strong>Euclidean</strong> (straight line, the default)</td><td>Square the differences, add them, take the square root</td><td>√[(x₁−y₁)² + (x₂−y₂)²]</td><td>√[3² + 2²] = √13 = <b>3.606</b></td></tr>
+<tr><td><strong>Manhattan</strong> (city blocks)</td><td>Add up the absolute differences</td><td>|x₁−y₁| + |x₂−y₂|</td><td>3 + 2 = <b>5</b></td></tr>
+<tr><td><strong>Minkowski</strong> (general)</td><td>The family that contains both: power p</td><td>(Σ |xᵢ−yᵢ|<sup>p</sup>)<sup>1/p</sup></td><td>p = 1 is Manhattan, p = 2 is Euclidean</td></tr>
+<tr><td><strong>Cosine</strong></td><td>Compares the <em>direction</em> of two vectors, not their length</td><td>1 − cos(angle)</td><td>Popular for text and embeddings</td></tr>
+</table></div>
+<p><strong>Euclidean = the way a crow flies. Manhattan = the way a taxi drives through a grid of streets.</strong> Euclidean is the default; Manhattan can be more robust when there are many features or outliers. The steps are the same with more features: just keep adding terms.</p>
+
+<h2>3. KNN by hand</h2>
+<p>Here are 8 labelled points, each with two features. We want to classify a new point <strong>Q = (4, 4)</strong>.</p>
+<div class="tw"><table>
+<tr><th>Point</th><th class="num">x₁</th><th class="num">x₂</th><th>Class</th></tr>
+<tr><td>A</td><td class="num">7</td><td class="num">8</td><td>Blue</td></tr>
+<tr><td>B</td><td class="num">4</td><td class="num">1</td><td>Blue</td></tr>
+<tr><td>C</td><td class="num">4</td><td class="num">2</td><td>Blue</td></tr>
+<tr><td>D</td><td class="num">8</td><td class="num">6</td><td>Blue</td></tr>
+<tr><td>E</td><td class="num">4</td><td class="num">3</td><td>Red</td></tr>
+<tr><td>F</td><td class="num">8</td><td class="num">8</td><td>Red</td></tr>
+<tr><td>G</td><td class="num">8</td><td class="num">5</td><td>Red</td></tr>
+<tr><td>H</td><td class="num">1</td><td class="num">6</td><td>Red</td></tr>
+</table></div>
+<p><strong>Step 1: distance from Q to every point (Euclidean).</strong></p>
+<div class="callout math">
+<div class="tw"><table>
+<tr><th>Point</th><th>Calculation</th><th class="num">Distance</th><th class="num">Rank</th></tr>
+<tr><td>E (Red)</td><td>√[(4−4)² + (3−4)²] = √(0 + 1)</td><td class="num">1.000</td><td class="num"><b>1</b></td></tr>
+<tr><td>C (Blue)</td><td>√[(4−4)² + (2−4)²] = √(0 + 4)</td><td class="num">2.000</td><td class="num"><b>2</b></td></tr>
+<tr><td>B (Blue)</td><td>√[(4−4)² + (1−4)²] = √(0 + 9)</td><td class="num">3.000</td><td class="num"><b>3</b></td></tr>
+<tr><td>H (Red)</td><td>√[(1−4)² + (6−4)²] = √(9 + 4)</td><td class="num">3.606</td><td class="num">4</td></tr>
+<tr><td>G (Red)</td><td>√[(8−4)² + (5−4)²] = √(16 + 1)</td><td class="num">4.123</td><td class="num">5</td></tr>
+<tr><td>D (Blue)</td><td>√[(8−4)² + (6−4)²] = √(16 + 4)</td><td class="num">4.472</td><td class="num">6</td></tr>
+<tr><td>A (Blue)</td><td>√[(7−4)² + (8−4)²] = √(9 + 16)</td><td class="num">5.000</td><td class="num">7</td></tr>
+<tr><td>F (Red)</td><td>√[(8−4)² + (8−4)²] = √(16 + 16)</td><td class="num">5.657</td><td class="num">8</td></tr>
+</table></div>
+<p><strong>Step 2: sort by distance and vote.</strong></p>
+<ul>
+<li><strong>K = 1</strong>: nearest is E → <strong>Red</strong>.</li>
+<li><strong>K = 3</strong>: E (Red), C (Blue), B (Blue) → 1 Red vs 2 Blue → <strong>Blue</strong>.</li>
+<li><strong>K = 5</strong>: E, C, B, H, G → Red, Blue, Blue, Red, Red → 3 Red vs 2 Blue → <strong>Red</strong>.</li>
+</ul>
+<p>The answer <strong>changes with K</strong>. That is the single most important hyperparameter of KNN, and we will see how to choose it below.</p></div>
+<p>Now do it yourself. Click on the plot to move the query point Q and watch the distance table re-rank itself. The circle reaches out exactly as far as the K-th neighbour.</p>
+<div class="demo" data-title="Classify a new point: distances, ranks, votes" id="demo-step">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="stepTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h3>Weighted voting: closer neighbours count more</h3>
+<p>In a plain vote every neighbour counts equally, even if one is far away. <strong>Distance weighting</strong> gives each neighbour a vote worth <em>1 ÷ distance</em>, so nearer ones matter more. Take K = 3 from above:</p>
+<div class="callout math"><p>Red: E at distance 1 → weight 1 ÷ 1 = <strong>1.000</strong>.
+<br>Blue: C at 2 → 0.500, B at 3 → 0.333 → total <strong>0.833</strong>.
+<br>Red (1.000) beats Blue (0.833), so the weighted answer is <strong>Red</strong>, even though the plain vote said Blue. Switch the "vote" button in the demo above to see it.</p></div>
+
+<h2>4. Choosing K: the bias–variance dial</h2>
+<ul>
+<li><strong>Small K (1, 2, 3):</strong> follows every wiggle of the data, including noise and mislabelled points. The boundary is jagged: <em>low bias, high variance, overfitting</em>. With K = 1 the training accuracy is always 100% (each point is its own nearest neighbour), which tells you nothing.</li>
+<li><strong>Large K:</strong> averages over many points, so the boundary becomes smooth and stable, but it can wash out real detail: <em>high bias, low variance, underfitting</em>. With K = the whole dataset you always predict the most common class.</li>
+</ul>
+<p>Rules of thumb: for two classes use an <strong>odd K</strong> so votes can't tie. A starting point is K ≈ √n (n = number of training points), but the reliable method is to <strong>try many values and pick the one with the best cross-validated score</strong>.</p>
+<div class="demo" data-title="Decision regions and the accuracy-vs-K curve" id="demo-regions">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class A</span><span><i style="background:var(--c2)"></i>class B</span><span>filled = training points · hollow = held-out test points · shading = what KNN would predict there</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Watch the shading: at K = 1 the regions form little islands around every stray point; as K grows the boundary smooths out. The right-hand curve shows <strong>training</strong> accuracy (blue) and <strong>test</strong> accuracy (orange) for every K. The best K is near the top of the orange curve, not at K = 1.</p>
+
+<h2>5. KNN is sensitive to scale: always standardise</h2>
+<p>Since KNN is <em>all</em> about distance, a feature measured in big numbers will dominate the distance, whether or not it matters. Salary in rupees (tens of thousands) will drown out age (tens). This is exactly the scaling problem from the Data Pre-processing lesson, and for KNN it is not optional.</p>
+<p>In the demo, customers are described by age and income. In truth <em>age</em> decides who buys (young people buy), income is irrelevant. Ask the model about a 27-year-old earning ₹62k:</p>
+<div class="demo" data-title="Same data, same K: raw units vs. standardised" id="demo-scale">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c3)"></i>buys</span><span><i style="background:var(--c2)"></i>doesn't buy</span><span>lines go to the K = 3 nearest neighbours</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p><strong>Standardising</strong> = (value − average) ÷ spread, computed per column, so age and income are both measured in "how many spreads from typical". Then a difference of "one spread" in age counts the same as one spread in income. (Details in the pre-processing lesson: <code>StandardScaler</code>.) Always fit the scaler on training data only.</p></div>
+
+<h2>6. KNN for regression</h2>
+<p>To predict a <em>number</em>, take the neighbours' values and average them (optionally weighted by 1 ÷ distance).</p>
+<div class="callout math"><p><em>Example.</em> Flats: 800 sq ft → ₹40 L, 1000 → 52, 1200 → 58, 1500 → 75, 1800 → 90. Predict a 1300 sq ft flat.
+<br>Distances: 1200 → 100, 1500 → 200, 1000 → 300, 1800 → 500, 800 → 500.
+<br>K = 2 → neighbours 1200 and 1500 → (58 + 75) ÷ 2 = <strong>₹66.5 L</strong>.
+<br>K = 3 → add 1000 → (52 + 58 + 75) ÷ 3 = <strong>₹61.7 L</strong>.</p></div>
+<div class="demo" data-title="KNN regression: a staircase that follows the data" id="demo-reg">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The prediction is a staircase. K = 1 passes through every point (overfits the noise); a large K gives a smooth, almost flat curve. Note that KNN regression can never predict values outside the range of the training targets, so it cannot extrapolate a trend.</p>
+
+<h2>7. Cost, speed and other practical issues</h2>
+<ul>
+<li><strong>Prediction is slow, training is instant.</strong> A naive search compares the new point with all n stored points: cost ≈ n × (number of features) per prediction. For large data scikit-learn uses smarter structures (<code>kd_tree</code>, <code>ball_tree</code>) or you use approximate nearest-neighbour libraries.</li>
+<li><strong>Memory:</strong> the whole training set must be kept.</li>
+<li><strong>Curse of dimensionality.</strong> With many features (hundreds), all points end up almost equally far apart, so "nearest" stops meaning "similar". Reduce dimensions (PCA) or select features first.</li>
+<li><strong>Irrelevant features</strong> add noise to distances. Remove them.</li>
+<li><strong>Imbalanced classes:</strong> the majority class dominates the vote; use distance weighting or a smaller K.</li>
+<li><strong>Categorical features:</strong> encode them (one-hot) and scale, or use a suitable metric.</li>
+<li><strong>Missing values</strong> must be handled first (<code>KNNImputer</code> even uses KNN itself to fill gaps).</li>
+</ul>
+
+<h2>8. KNN in scikit-learn</h2>
+<p>Our hand example, reproduced:</p>
+<pre class="code">
+from sklearn.neighbors import KNeighborsClassifier
+
+X = [[7, 8], [4, 1], [4, 2], [8, 6], [4, 3], [8, 8], [8, 5], [1, 6]]
+y = ["Blue", "Blue", "Blue", "Blue", "Red", "Red", "Red", "Red"]
+
+for k in (1, 3, 5):
+    model = KNeighborsClassifier(n_neighbors=k).fit(X, y)   # "fit" just stores the data
+    print(k, model.predict([[4, 4]]))
+# 1 ['Red']   3 ['Blue']   5 ['Red']
+
+model = KNeighborsClassifier(n_neighbors=3).fit(X, y)
+dist, idx = model.kneighbors([[4, 4]])      # who are the neighbours?
+print(dist)                                  # [[1. 2. 3.]]
+print(idx)                                   # [[4 2 1]]  -> points E, C, B
+print(model.predict_proba([[4, 4]]))         # [[0.667 0.333]]  classes: Blue, Red
+
+weighted = KNeighborsClassifier(n_neighbors=3, weights="distance").fit(X, y)
+print(weighted.predict([[4, 4]]))            # ['Red']  (closer neighbours count more)
+</pre>
+<p>A realistic pipeline: scale, then search for the best K with cross-validation:</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+
+pipe = Pipeline([("scale", StandardScaler()), ("knn", KNeighborsClassifier())])
+grid = GridSearchCV(pipe,
+                    {"knn__n_neighbors": range(1, 31, 2),          # odd K only
+                     "knn__weights": ["uniform", "distance"],
+                     "knn__metric": ["euclidean", "manhattan"]},
+                    cv=5)
+grid.fit(X_train, y_train)
+
+print(grid.best_params_)
+print("test accuracy:", grid.score(X_test, y_test))
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter</th><th>What it does</th></tr>
+<tr><td><code>n_neighbors</code></td><td>K. Default 5.</td></tr>
+<tr><td><code>weights</code></td><td><code>"uniform"</code> (equal votes) or <code>"distance"</code> (1 ÷ distance).</td></tr>
+<tr><td><code>metric</code>, <code>p</code></td><td><code>"minkowski"</code> with <code>p=2</code> is Euclidean (default), <code>p=1</code> is Manhattan; or <code>metric="cosine"</code> etc.</td></tr>
+<tr><td><code>algorithm</code></td><td><code>"auto"</code>, <code>"brute"</code>, <code>"kd_tree"</code>, <code>"ball_tree"</code>: how neighbours are searched.</td></tr>
+<tr><td><code>KNeighborsRegressor</code></td><td>Same parameters; averages the neighbours' values.</td></tr>
+<tr><td><code>kneighbors(X)</code></td><td>Returns the distances and indices of the neighbours: great for explaining a prediction ("because of these 5 similar cases").</td></tr>
+</table></div>
+
+<h2>9. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Dead simple, easy to explain</td><td>Slow at prediction time on large data</td></tr>
+<tr><td>No training; new data can be added instantly</td><td>Needs scaling; irrelevant features hurt</td></tr>
+<tr><td>Handles complex, non-linear boundaries and multiple classes</td><td>Struggles in high dimensions</td></tr>
+<tr><td>Works for classification and regression</td><td>Sensitive to noisy labels when K is small</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🎬 Recommendations</h4><p>"Users like you also enjoyed…": find the K most similar users (or items) and recommend what they liked.</p></div>
+<div class="card"><h4>✍️ Handwriting recognition</h4><p>A classic benchmark: compare a digit image with labelled images of digits. Plain KNN gets roughly 97% on the MNIST digits.</p></div>
+<div class="card"><h4>🏥 Similar-patient search</h4><p>Find past patients with similar tests and see how they responded to treatment.</p></div>
+<div class="card"><h4>🕵️ Anomaly detection</h4><p>A point whose K nearest neighbours are all very far away is an outlier (fraud, faulty sensor).</p></div>
+<div class="card"><h4>🧩 Missing-value imputation</h4><p><code>KNNImputer</code> fills a gap with the average of the K most similar rows.</p></div>
+<div class="card"><h4>🔎 Semantic & vector search</h4><p>Modern search, image lookup and AI "retrieval" systems are nearest-neighbour search on embeddings, KNN at enormous scale.</p></div>
+<div class="card"><h4>📍 Location services</h4><p>"Nearest stores/drivers" is literally a nearest-neighbour query.</p></div>
+<div class="card"><h4>🏠 Property valuation</h4><p>Estimate a home's price from the sale prices of the K most comparable homes ("comps").</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>KNN stores the data, and predicts by <strong>voting (classification) or averaging (regression) among the K nearest points</strong>.</li>
+<li>"Nearest" = smallest <strong>distance</strong>: Euclidean (√ of the sum of squared differences) by default, Manhattan (sum of absolute differences) as an alternative.</li>
+<li><strong>K</strong> is the key dial: small = flexible but noisy (overfit), large = smooth but blunt (underfit). Choose it by cross-validation; use odd K for two classes.</li>
+<li><strong>Always scale</strong> your features; remove irrelevant ones; beware many dimensions.</li>
+<li>Distance weighting lets closer neighbours count more.</li>
+<li>Training is instant, prediction is slow: fine for small/medium data, use tree-based search or approximate methods for big data.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Using the 8-point table in section 3, classify a new point <strong>Q = (7, 6)</strong> with K = 3 by hand. Compute all Euclidean distances, rank them and vote.</li>
+<li>Repeat with <strong>Manhattan</strong> distance. Does the answer change?</li>
+<li>Confirm your answer with <code>KNeighborsClassifier(n_neighbors=3)</code> and <code>kneighbors()</code>.</li>
+<li>Bonus: on the breast-cancer data, compare the test accuracy of KNN <em>with</em> and <em>without</em> <code>StandardScaler</code>. How big is the difference?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Distances from (7, 6): D (8,6) → 1.000; G (8,5) → √(1+1) = 1.414; A (7,8) → 2.000; F (8,8) → √(1+4) = 2.236; E (4,3) → √(9+9) = 4.243; and the rest are farther. Nearest three: D (Blue), G (Red), A (Blue) → 2 Blue vs 1 Red → <b>Blue</b>.</p>
+<p><b>2.</b> Manhattan: D → 1, G → 2, A → 2, F → 3. Nearest three: D (Blue), then G and A tie at 2 (both included), giving the same neighbours → <b>Blue</b> again.</p>
+<p><b>3.</b> <code>predict([[7, 6]])</code> gives <code>['Blue']</code>; <code>kneighbors</code> returns distances ≈ [[1. 1.414 2.]].</p>
+<p><b>4.</b> Unscaled features with very different ranges usually lower the accuracy noticeably (often by several percentage points on this dataset); scaling fixes it.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/knn.js"></script>
+</body>
+</html>

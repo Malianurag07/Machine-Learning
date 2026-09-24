@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction to Machine Learning · ML, Visually</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-topic="intro">
+<article id="lesson">
+
+<h1>Introduction to Machine Learning</h1>
+<p class="lede">Machine learning is how we get computers to find the rules by themselves, from examples, instead of us writing every rule by hand.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 35 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. What is machine learning?</h2>
+<p><strong>Machine Learning (ML)</strong> is a branch of computer science in which a program <em>improves at a task through experience (data)</em> rather than through hand-written instructions. A classic definition by Tom Mitchell (1997) says it precisely:</p>
+<div class="callout tip"><p>A program <strong>learns</strong> from experience <strong>E</strong> with respect to a task <strong>T</strong> and a performance measure <strong>P</strong>, if its performance at T, as measured by P, improves with experience E.</p></div>
+<p>Map that onto a spam filter: <strong>T</strong> = decide whether an email is spam; <strong>E</strong> = thousands of emails already marked "spam" or "not spam"; <strong>P</strong> = the percentage of emails classified correctly. If accuracy goes up as it sees more emails, it is learning.</p>
+
+<div class="callout analogy"><p><strong>Recipe vs. learning to cook.</strong> Classic programming is handing the computer an exact recipe: "add 2 g of salt, bake 20 minutes." Machine learning is letting the computer taste hundreds of finished dishes (with ratings) and work out for itself what makes a dish good. Nobody wrote the recipe; it was <em>discovered</em> from examples.</p></div>
+
+<h3>Traditional programming vs. machine learning</h3>
+<div class="flow"><div class="box a">Data</div><span class="arr">+</span><div class="box b">Rules (written by a human)</div><span class="arr">→</span><div class="box c">Answers</div></div>
+<div class="flow"><div class="box a">Data</div><span class="arr">+</span><div class="box c">Answers (examples)</div><span class="arr">→</span><div class="box b">Rules (found by the machine)</div></div>
+<p>In the first row a developer writes rules such as <code>if "free money" in email: spam</code>. That works until spammers write "fr33 m0ney". You would need endless rules and constant patching. In the second row we give the machine emails <em>with their answers</em> and it produces the rules, called a <strong>model</strong>, on its own. The model can then be applied to emails it has never seen.</p>
+
+<div class="demo" data-title="Write the rule yourself, then let the machine learn it" id="demo-threshold">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Notice what "learning" meant in that demo: the machine had a <strong>rule with a knob</strong> (the threshold), a <strong>score</strong> (accuracy) and a <strong>search</strong> for the knob position that gives the best score. Almost every ML algorithm in this course is a fancier version of exactly that: a flexible rule, a way to score it, and a way to search for its best settings.</p>
+
+<h2>2. AI vs. Machine Learning vs. Deep Learning</h2>
+<p>These words are often used interchangeably, but they are nested, like Russian dolls. Click each ring.</p>
+<div class="demo" data-title="The nesting of AI, ML and Deep Learning" id="demo-nest">
+  <div class="db">
+    <div id="nest" style="display:grid;place-items:center;padding:6px 0">
+      <div class="ring" data-k="ai" style="width:min(100%,520px);padding:16px 16px 20px;border:2px solid var(--c4);border-radius:22px;cursor:pointer;background:color-mix(in srgb,var(--c4) 7%,transparent)">
+        <b style="color:var(--c4)">Artificial Intelligence</b>
+        <div class="ring" data-k="ml" style="margin:10px 0 0;padding:14px 14px 18px;border:2px solid var(--c1);border-radius:18px;background:color-mix(in srgb,var(--c1) 8%,transparent)">
+          <b style="color:var(--c1)">Machine Learning</b>
+          <div class="ring" data-k="dl" style="margin:10px 0 0;padding:14px;border:2px solid var(--c3);border-radius:14px;background:color-mix(in srgb,var(--c3) 9%,transparent)">
+            <b style="color:var(--c3)">Deep Learning</b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="readout" id="nestOut"></div>
+</div>
+<ul>
+  <li><strong>Artificial Intelligence</strong>: any technique that lets machines mimic intelligent behaviour, including hand-coded logic such as a chess engine built from fixed rules.</li>
+  <li><strong>Machine Learning</strong>: the subset of AI where behaviour is <em>learned from data</em>. Linear regression, decision trees, SVMs and k-means all live here. This is what this course is about.</li>
+  <li><strong>Deep Learning</strong>: the subset of ML that uses many-layered neural networks. It excels on images, audio and text, but usually needs far more data and computing power.</li>
+</ul>
+<p>Also nearby: <strong>Data Science</strong> is the broader practice of extracting insight from data (statistics, visualisation, ML, business understanding). ML is one of its tools.</p>
+
+<h2>3. The vocabulary you will hear in every lesson</h2>
+<p>Below is a tiny dataset for predicting house prices. Click a term to see it highlighted in the data.</p>
+<div class="demo" data-title="Learn the terms on a real table" id="demo-vocab">
+  <div class="controls" id="vocabBtns"></div>
+  <div class="db"><div class="tw"><table id="vocabTbl" class="hl"></table></div></div>
+  <div class="readout" id="vocabOut"></div>
+</div>
+<div class="tw"><table>
+<tr><th>Term</th><th>Meaning</th><th>Everyday example</th></tr>
+<tr><td><strong>Sample / row / instance</strong></td><td>One example in the data.</td><td>One house.</td></tr>
+<tr><td><strong>Feature / input / independent variable (X)</strong></td><td>A measurable property used to make the prediction.</td><td>Area, bedrooms, age.</td></tr>
+<tr><td><strong>Label / target / output / dependent variable (y)</strong></td><td>The thing we want to predict. Only present in supervised learning.</td><td>The price.</td></tr>
+<tr><td><strong>Dataset</strong></td><td>The whole table of samples.</td><td>All houses we collected.</td></tr>
+<tr><td><strong>Model</strong></td><td>The learned rule or function mapping features to a prediction.</td><td>"Price ≈ 50·area + 2000·bedrooms − 800·age".</td></tr>
+<tr><td><strong>Parameters</strong></td><td>Numbers inside the model that are <em>learned from data</em>.</td><td>The 50, 2000 and −800 above (θ, weights, coefficients).</td></tr>
+<tr><td><strong>Hyperparameters</strong></td><td>Settings <em>you choose before</em> training; the model does not learn them.</td><td>How many neighbours (K) in KNN; the depth of a tree.</td></tr>
+<tr><td><strong>Training</strong></td><td>Adjusting the parameters so predictions match the known answers.</td><td>Studying with an answer key.</td></tr>
+<tr><td><strong>Inference / prediction</strong></td><td>Using the trained model on new data.</td><td>Sitting the real exam.</td></tr>
+<tr><td><strong>Loss / cost function</strong></td><td>A number that measures how wrong the model is. Training tries to minimise it.</td><td>Marks lost in the practice test.</td></tr>
+<tr><td><strong>Generalisation</strong></td><td>How well the model does on data it has never seen.</td><td>Doing well on new exam questions, not just memorised ones.</td></tr>
+</table></div>
+
+<h2>4. How does a model actually learn?</h2>
+<p>Whatever the algorithm, training follows the same four-beat loop:</p>
+<ol class="steps">
+<li><strong>Predict.</strong> Use the current parameters to guess an answer for every training sample.</li>
+<li><strong>Measure the error.</strong> Compare guesses to the true labels using a loss function.</li>
+<li><strong>Adjust.</strong> Nudge each parameter in the direction that reduces the loss (often using <em>gradient descent</em>, which follows the slope downhill).</li>
+<li><strong>Repeat</strong> until the loss stops improving.</li>
+</ol>
+<div class="callout analogy"><p><strong>Walking down a foggy hill.</strong> You are blindfolded on a hillside and want the valley (lowest loss). At each step you feel which way the ground slopes downward and take a small step that way. The step size is the <em>learning rate</em>: too tiny and it takes forever, too big and you overshoot into the opposite hillside.</p></div>
+<p>Below, a straight line \(\hat{y} = w x + b\) is learned from 14 noisy points. The <strong>loss</strong> is the mean squared error, and we follow its slope.</p>
+<div class="demo" data-title="Watch a line learn with gradient descent" id="demo-gd">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math">
+<p><strong>Loss</strong> = the <em>average of the squared mistakes</em>. A "mistake" is the prediction minus the truth: <code>error = (w·x + b) − y</code>. Squaring makes every mistake positive and punishes big ones more.</p>
+<p><strong>The update rule in plain words</strong> (α is the small step size):</p>
+<ul>
+<li>new <code>w</code> = old <code>w</code> − α × 2 × (average of <em>error × x</em>)</li>
+<li>new <code>b</code> = old <code>b</code> − α × 2 × (average of <em>error</em>)</li>
+</ul>
+<p>Why it works: if predictions are too low, the errors are negative, so "minus a negative" pushes w and b <em>up</em>; if predictions are too high they get pushed <em>down</em>. Bigger mistakes give bigger pushes.</p>
+<p><em>Tiny example.</em> Points (1,1), (2,2), (3,3); start w = 0, b = 0, α = 0.1. Every prediction is 0, so the errors are −1, −2, −3.
+<br>• average of error × x = (−1×1 − 2×2 − 3×3) ÷ 3 = −4.67; times 2 = −9.33, so new w = 0 − 0.1 × (−9.33) = <strong>0.933</strong>.
+<br>• average of error = −6 ÷ 3 = −2; times 2 = −4, so new b = 0 − 0.1 × (−4) = <strong>0.4</strong>.
+<br>One step and the line already sits much closer to the data. (The Linear Regression lesson walks through this in full.)</p>
+</div>
+
+<h2>5. Learning is not memorising: generalisation</h2>
+<p>A model that only memorises the training data is useless; we care about performance on <strong>new</strong> data. That is why we always keep a slice of data hidden as a <strong>test set</strong>, and only judge the model on that.</p>
+<ul>
+<li><strong>Underfitting (high bias):</strong> the model is too simple to capture the pattern (a straight line through a curve). It is bad on training <em>and</em> test data.</li>
+<li><strong>Overfitting (high variance):</strong> the model is so flexible that it learns the noise. Excellent on training data, poor on test data.</li>
+<li><strong>Good fit:</strong> captures the real pattern, and test error is close to training error.</li>
+</ul>
+<div class="callout analogy"><p><strong>The student who memorised last year's paper.</strong> They score 100% on the past paper (training data) but fail when the questions change slightly (test data). The student who understood the concepts scores well on both.</p></div>
+<div class="demo" data-title="Underfit ↔ overfit: change the flexibility of the model" id="demo-fit">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>training points (model sees these)</span><span><i style="background:transparent;border:2px solid var(--c2)"></i>test points (hidden)</span><span>dashed = true pattern</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The right-hand graph is the classic <strong>U-shape</strong> of the test error: as flexibility increases, training error keeps falling but test error falls and then <em>rises</em>. Finding the bottom of that U is much of an ML engineer's job, and the tools for doing so (train/test split, cross-validation, regularisation such as Ridge and LASSO) each get their own lessons.</p>
+
+<h2>6. Your first model in scikit-learn</h2>
+<p><strong>scikit-learn</strong> (<code>sklearn</code>) is the standard Python library for classical machine learning. Its big idea is that every model has the <em>same interface</em>: create it, <code>.fit()</code> it on training data, <code>.predict()</code> on new data, and <code>.score()</code> it. Learn this once and you know the whole library.</p>
+<pre class="code">
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+
+# 1. Data: X = features (4 flower measurements), y = label (3 species)
+X, y = load_iris(return_X_y=True)
+print(X.shape, y.shape)          # (150, 4) (150,)
+
+# 2. Hide 20% of the data as a test set
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42)
+
+# 3. Create a model (K=3 is a hyperparameter we choose)
+model = KNeighborsClassifier(n_neighbors=3)
+
+# 4. Train: learn from the labelled examples
+model.fit(X_train, y_train)
+
+# 5. Predict on new, unseen flowers
+print(model.predict(X_test[:3]))
+
+# 6. Evaluate on the hidden test set
+print(model.score(X_test, y_test))
+</pre>
+<pre class="out">(150, 4) (150,)
+[1 0 2]
+1.0</pre>
+<div class="tw"><table>
+<tr><th>Line</th><th>What it does</th></tr>
+<tr><td><code>load_iris(return_X_y=True)</code></td><td>Returns a built-in dataset as the feature matrix <code>X</code> (150 rows × 4 columns) and label vector <code>y</code>.</td></tr>
+<tr><td><code>train_test_split(..., test_size=0.2)</code></td><td>Randomly holds out 20% for testing. <code>random_state</code> fixes the shuffle so results are repeatable.</td></tr>
+<tr><td><code>KNeighborsClassifier(n_neighbors=3)</code></td><td>Builds the model object. Hyperparameters go in the brackets. Nothing is learned yet.</td></tr>
+<tr><td><code>.fit(X_train, y_train)</code></td><td>Training. The model's parameters are learned here.</td></tr>
+<tr><td><code>.predict(X_new)</code></td><td>Inference. Returns predicted labels.</td></tr>
+<tr><td><code>.score(X_test, y_test)</code></td><td>Accuracy for classifiers (R² for regressors) on data the model has never seen.</td></tr>
+</table></div>
+<p>Swap <code>KNeighborsClassifier</code> for <code>DecisionTreeClassifier</code> or <code>SVC</code> and the other lines stay identical. The exact numbers you get may differ slightly with library versions.</p>
+
+<h2>7. Machine learning in the real world</h2>
+<p>ML is already inside products you use every day. Each card shows what is being predicted, from what data, and which family of ML it uses (you will learn these families in the next lesson).</p>
+<div class="cards">
+<div class="card"><h4>📧 Spam filtering</h4><p><b>Predicts:</b> spam or not.<br><b>From:</b> words, sender, links in past emails.</p><span class="tag">Classification</span></div>
+<div class="card"><h4>🎬 Recommendations</h4><p><b>Predicts:</b> what you will watch or buy next.<br><b>From:</b> your history and similar users.</p><span class="tag">Clustering · Ranking</span></div>
+<div class="card"><h4>🚗 Maps & ETA</h4><p><b>Predicts:</b> arrival time.<br><b>From:</b> live traffic, past trips, weather.</p><span class="tag">Regression</span></div>
+<div class="card"><h4>💳 Fraud detection</h4><p><b>Predicts:</b> is this transaction fraudulent?<br><b>From:</b> amount, location, spending pattern.</p><span class="tag">Classification · Anomaly</span></div>
+<div class="card"><h4>🩺 Medical imaging</h4><p><b>Predicts:</b> tumour present or not.<br><b>From:</b> scans labelled by doctors.</p><span class="tag">Deep learning</span></div>
+<div class="card"><h4>🗣️ Voice & translation</h4><p><b>Predicts:</b> words from sound; text in another language.<br><b>From:</b> huge speech and text corpora.</p><span class="tag">Deep learning</span></div>
+<div class="card"><h4>🛒 Demand forecasting</h4><p><b>Predicts:</b> units sold next week.<br><b>From:</b> past sales, holidays, prices.</p><span class="tag">Regression</span></div>
+<div class="card"><h4>🏭 Predictive maintenance</h4><p><b>Predicts:</b> machine failing in the next 7 days.<br><b>From:</b> vibration and temperature sensors.</p><span class="tag">Classification</span></div>
+<div class="card"><h4>🌾 Agriculture</h4><p><b>Predicts:</b> crop yield; disease from leaf photos.<br><b>From:</b> weather, soil, drone images.</p><span class="tag">Regression · Vision</span></div>
+<div class="card"><h4>🏦 Credit scoring</h4><p><b>Predicts:</b> chance a borrower repays.<br><b>From:</b> income, history, existing debt.</p><span class="tag">Logistic regression</span></div>
+<div class="card"><h4>🎮 Game AI & robots</h4><p><b>Learns:</b> which moves win.<br><b>From:</b> trial, error and rewards.</p><span class="tag">Reinforcement</span></div>
+<div class="card"><h4>💬 Chatbots (LLMs)</h4><p><b>Predicts:</b> the next word.<br><b>From:</b> a large share of the internet's text.</p><span class="tag">Deep learning</span></div>
+</div>
+<div class="callout real"><p><strong>Reality check.</strong> In industry, the model is often only ~10% of the work. Most of a real ML project is collecting and cleaning data, defining the right target, deploying the model, and monitoring it as the world changes. That is why this course has a whole <em>ML Pipeline</em> section and a <em>Deployment</em> section.</p></div>
+
+<h2>8. When should you use ML (and when not)?</h2>
+<div class="tw"><table>
+<tr><th>ML is a good fit when…</th><th>Skip ML when…</th></tr>
+<tr><td>Rules are too many or too complex to write by hand (recognising faces).</td><td>A few clear rules solve it (tax = 18% of income).</td></tr>
+<tr><td>The rules keep changing (new fraud tactics), so the system must re-learn.</td><td>You have almost no data and cannot get any.</td></tr>
+<tr><td>You have plenty of representative, quality data.</td><td>A wrong prediction is catastrophic and you cannot explain or verify it.</td></tr>
+<tr><td>Small errors are acceptable and the system is measurable.</td><td>You need a guaranteed exact answer (bank balance, arithmetic).</td></tr>
+</table></div>
+
+<h2>9. A short history</h2>
+<div class="tw"><table>
+<tr><th>Year</th><th>Milestone</th></tr>
+<tr><td>1950</td><td>Alan Turing asks "Can machines think?" and proposes the Turing Test.</td></tr>
+<tr><td>1957</td><td>Frank Rosenblatt builds the Perceptron, an early learning neuron.</td></tr>
+<tr><td>1967</td><td>The nearest-neighbour algorithm (basis of KNN) is published.</td></tr>
+<tr><td>1986</td><td>Backpropagation popularised, making multi-layer neural networks trainable.</td></tr>
+<tr><td>1995</td><td>Support Vector Machines and (soon after) Random Forests become dominant.</td></tr>
+<tr><td>1997</td><td>IBM Deep Blue beats world chess champion Garry Kasparov.</td></tr>
+<tr><td>2012</td><td>AlexNet wins ImageNet by a wide margin, launching the deep learning era.</td></tr>
+<tr><td>2016</td><td>AlphaGo defeats Go champion Lee Sedol using deep reinforcement learning.</td></tr>
+<tr><td>2017–now</td><td>The Transformer architecture powers large language models and generative AI.</td></tr>
+</table></div>
+
+<h2>10. Limits and responsible ML</h2>
+<ul>
+<li><strong>Garbage in, garbage out.</strong> A model can only be as good as its data. Missing, wrong, or unrepresentative data produces unreliable predictions.</li>
+<li><strong>Bias.</strong> If historical data reflects unfair decisions (for example past hiring), the model learns and repeats them. Always check performance across different groups.</li>
+<li><strong>Data leakage.</strong> Accidentally letting information from the answer or from the test set slip into training makes the score look wonderful and the real-world results collapse.</li>
+<li><strong>Correlation ≠ causation.</strong> Ice cream sales predict drowning deaths (both rise in summer), but banning ice cream would not save lives.</li>
+<li><strong>Drift.</strong> The world changes, and a model trained on last year's behaviour slowly gets worse. Deployed models must be monitored (Workflow step 10).</li>
+<li><strong>Privacy and explainability.</strong> Ask what data you are allowed to use, and whether you can explain a decision to the person it affects.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>ML finds the rules from <em>examples</em>; classic programming needs you to write the rules.</li>
+<li>Training = <strong>predict → measure error → adjust → repeat</strong>.</li>
+<li>Parameters are learned; hyperparameters are chosen by you.</li>
+<li>Judge a model on <strong>unseen</strong> data; beware of underfitting and overfitting.</li>
+<li>In scikit-learn every model follows <code>fit → predict → score</code>.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (5–10 minutes, optional).</strong></p>
+<ol>
+<li>Pick a problem from your own life (predict your electricity bill, whether it will rain, how long your commute takes).</li>
+<li>Write down: the <em>samples</em> (one row = what?), 3–4 <em>features</em>, the <em>label</em>, and whether the label is a number or a category.</li>
+<li>Bonus: install scikit-learn (<code>pip install scikit-learn</code>), run the iris code above, and change <code>n_neighbors</code> from 3 to 15. Does the score change?</li>
+</ol>
+<details><summary>Example answer</summary><p>Commute time: sample = one trip; features = leave time, day of week, rain (yes/no), distance; label = minutes taken (a number, so <em>regression</em>).</p></details>
+</div>
+
+</article>
+<script src="../js/topics.js"></script>
+<script src="../js/lib/viz.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/pages/introduction.js"></script>
+</body>
+</html>

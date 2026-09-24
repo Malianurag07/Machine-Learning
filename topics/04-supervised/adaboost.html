@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdaBoost · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="ada">
+<article id="lesson">
+
+<h1>AdaBoost</h1>
+<p class="lede">A random forest grows many trees <em>side by side</em>. AdaBoost grows them <em>one after another</em>, and each new tiny model is built to fix what the previous ones got wrong. Many weak guessers, each obsessed with the previous ones' mistakes, add up to a strong classifier.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 85 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: boosting</h2>
+<p>A <strong>weak learner</strong> is a model that is only slightly better than guessing: for example a <strong>stump</strong>, a decision tree with a single question. <strong>Boosting</strong> is the idea of combining many weak learners into one strong one, by training them <em>in sequence</em>, each concentrating on the examples the earlier ones found hard. <strong>AdaBoost</strong> (Adaptive Boosting, 1995) was the first practical way of doing it.</p>
+<div class="callout analogy"><p><strong>The revising student.</strong> You sit a practice test and mark it. Instead of re-reading everything, you spend your next study session <em>only on the questions you got wrong</em>. Then you test again, and again focus on whatever is still wrong. Now imagine each study session is a separate tutor, and at the end you ask all the tutors to vote, but you trust the tutors who were more accurate more. That is AdaBoost: the questions are your training points, "how much you worry about a question" is its <strong>weight</strong>, and "how much you trust a tutor" is the stump's <strong>say (α)</strong>.</p></div>
+<h3>The algorithm in plain words</h3>
+<ol>
+<li>Start with every training point equally important: weight = 1 ÷ n.</li>
+<li>Train a stump, taking the weights into account (a heavy point matters more when choosing the split).</li>
+<li>Measure its <strong>weighted error</strong>: add up the weights of the points it got wrong.</li>
+<li>Give the stump a <strong>say</strong> α: big if its error is small, zero if it is a coin flip.</li>
+<li><strong>Raise the weights of the points it got wrong, lower those it got right</strong>, and rescale so the weights add up to 1 again.</li>
+<li>Repeat from step 2 for the chosen number of rounds.</li>
+<li>Final prediction: every stump votes (+1 or −1) with strength α; the sign of the total is the answer.</li>
+</ol>
+<div class="tw"><table>
+<tr><th></th><th>Random Forest (bagging)</th><th>AdaBoost (boosting)</th></tr>
+<tr><td>Trees are built</td><td>independently, in parallel</td><td>one after another, each depends on the last</td></tr>
+<tr><td>Each tree is</td><td>deep and strong, but noisy</td><td>tiny and weak (often a stump)</td></tr>
+<tr><td>Each tree sees</td><td>a random re-sample of rows</td><td>all rows, but re-weighted towards past mistakes</td></tr>
+<tr><td>Votes are</td><td>equal</td><td>weighted by α</td></tr>
+<tr><td>Main effect</td><td>lowers variance</td><td>lowers bias (makes a simple model flexible)</td></tr>
+</table></div>
+
+<h2>2. The maths, by hand</h2>
+<div class="callout math">
+<p>Only three formulas are needed. In words first, then the formula:</p>
+<ul>
+<li><strong>Weighted error</strong> = the total weight of the points the stump got wrong.</li>
+<li><strong>Say</strong> α = ½ × ln( (1 − error) ÷ error ). (ln is the natural logarithm, the "ln" button on a calculator.)</li>
+<li><strong>Weight update:</strong> a point the stump got <em>wrong</em> gets its weight multiplied by e<sup>α</sup> (bigger than 1). A point it got <em>right</em> is multiplied by e<sup>−α</sup> (smaller than 1). Then divide everything by the total so the weights add up to 1.</li>
+</ul>
+<div class="tw"><table>
+<tr><th class="num">stump's error</th><th class="num">say α</th><th>meaning</th></tr>
+<tr><td class="num">0.1</td><td class="num">1.099</td><td>very trustworthy</td></tr>
+<tr><td class="num">0.2</td><td class="num">0.693</td><td>trustworthy</td></tr>
+<tr><td class="num">0.3</td><td class="num">0.424</td><td>somewhat useful</td></tr>
+<tr><td class="num">0.5</td><td class="num">0</td><td>a coin flip: no say</td></tr>
+<tr><td class="num">0.7</td><td class="num">−0.424</td><td>worse than chance: its vote is flipped</td></tr>
+</table></div></div>
+<div class="demo" data-title="How much say does a stump get?" id="demo-alpha">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h3>A complete worked example: 10 points, 3 rounds</h3>
+<p>Ten points on a line with a pattern no single cut can capture: <strong>+ + + − − − + + + −</strong> for x = 1 to 10. Each weak learner is a stump: "x ≤ some cut → one class, otherwise the other".</p>
+<div class="tw"><table>
+<tr><th>x</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">8</td><td class="num">9</td><td class="num">10</td></tr>
+<tr><th>class</th><td class="num">+</td><td class="num">+</td><td class="num">+</td><td class="num">−</td><td class="num">−</td><td class="num">−</td><td class="num">+</td><td class="num">+</td><td class="num">+</td><td class="num">−</td></tr>
+<tr><th>start weight</th><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Round 1.</strong> Best stump (lowest weighted error): <em>x ≤ 3.5 → +, otherwise −</em>. It is wrong on points 7, 8, 9 (all true +, predicted −). Error = 0.1 + 0.1 + 0.1 = <strong>0.300</strong>. Say α₁ = ½ ln(0.7 ÷ 0.3) = <strong>0.424</strong>.
+<br>Multipliers: wrong points × e<sup>0.424</sup> = <b>×1.528</b>, right points × e<sup>−0.424</sup> = <b>×0.655</b>. New raw weights: wrong 0.1528, right 0.0655. Their total is 3 × 0.1528 + 7 × 0.0655 = 0.9165; dividing by it gives the new weights: <b>points 7, 8, 9: 0.167</b> each, all others <b>0.071</b> each.</p>
+<p><strong>Round 2.</strong> With the new weights, the best stump is <em>x ≤ 9.5 → +, otherwise −</em>. Wrong on points 4, 5, 6 (weight 0.071 each). Error = <strong>0.214</strong>, α₂ = ½ ln(0.786 ÷ 0.214) = <strong>0.650</strong>. Multipliers: wrong ×1.915, right ×0.522. New weights: points 4, 5, 6 → <b>0.167</b>; points 7, 8, 9 → <b>0.106</b>; points 1, 2, 3 and 10 → <b>0.045</b>.</p>
+<p><strong>Round 3.</strong> Best stump now: <em>x ≤ 6.5 → −, otherwise +</em> (note the flipped direction). Wrong on points 1, 2, 3 and 10 (0.045 each). Error = <strong>0.182</strong>, α₃ = ½ ln(0.818 ÷ 0.182) = <strong>0.752</strong>.</p></div>
+<p>Every stump is wrong on 3 or 4 of the 10 points, yet look at the combined vote. Score = α₁ · h₁ + α₂ · h₂ + α₃ · h₃, where each h is +1 or −1:</p>
+<div class="tw"><table>
+<tr><th>Point x</th><th>Stump 1 (0.424)</th><th>Stump 2 (0.650)</th><th>Stump 3 (0.752)</th><th class="num">Total score</th><th>Prediction</th><th>True</th></tr>
+<tr><td>1, 2, 3</td><td>+</td><td>+</td><td>−</td><td class="num">0.424 + 0.650 − 0.752 = <b>0.321</b></td><td>+</td><td>+ ✔</td></tr>
+<tr><td>4, 5, 6</td><td>−</td><td>+</td><td>−</td><td class="num">−0.424 + 0.650 − 0.752 = <b>−0.526</b></td><td>−</td><td>− ✔</td></tr>
+<tr><td>7, 8, 9</td><td>−</td><td>+</td><td>+</td><td class="num">−0.424 + 0.650 + 0.752 = <b>0.978</b></td><td>+</td><td>+ ✔</td></tr>
+<tr><td>10</td><td>−</td><td>−</td><td>+</td><td class="num">−0.424 − 0.650 + 0.752 = <b>−0.321</b></td><td>−</td><td>− ✔</td></tr>
+</table></div>
+<p><strong>All 10 correct after 3 rounds</strong>, from three weak stumps that were individually only 70%, 70% and 60% accurate. Step through it yourself:</p>
+<div class="demo" data-title="Watch the weights move, round by round" id="demo-round">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>A neat fact worth checking.</strong> After the update in round 1, the three misclassified points have weight 3 × 0.167 = <b>0.5</b>: exactly half of all the weight. The same happens every round. So, as far as the reweighted data is concerned, the stump you just used is a pure coin flip (error 0.5). That is why the <em>next</em> stump is forced to be different and to concentrate on the hard points: the same stump would be useless.</p></div>
+
+<h2>3. AdaBoost on real-shaped data</h2>
+<p>Now with two features. The base learner is a weak tree (by default depth 1, so each round is a single straight cut parallel to an axis). The shading is the combined vote; <strong>the size of each training dot shows its current weight</strong>, so you can watch the algorithm's attention shift to the hard points as you add rounds.</p>
+<div class="demo" data-title="Grow an AdaBoost ensemble" id="demo-2d">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class +1</span><span><i style="background:var(--c2)"></i>class −1</span><span>filled = training (size = weight at that round) · hollow = test · lines: blue = training accuracy, orange = test accuracy</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Rounds 1 to 5:</strong> a few straight cuts; the boundary is blocky.</li>
+<li><strong>Circles data:</strong> no single cut can split a ring from its centre, yet a handful of stumps combine into a rough square around the centre.</li>
+<li><strong>Base depth 3:</strong> stronger learners; boosting can fit the training data perfectly in a few rounds and stops by itself.</li>
+<li><strong>Turn on label noise:</strong> mislabelled points are always "wrong", so their weights snowball, and the ensemble bends itself around them. This is AdaBoost's famous weak spot.</li>
+<li><strong>Learning rate below 1:</strong> each stump's say is shrunk, so it takes more rounds but the growth is gentler. The classic trade-off: <code>learning_rate</code> vs <code>n_estimators</code>.</li>
+</ul>
+
+<h2>4. AdaBoost in scikit-learn</h2>
+<p>Our worked example, reproduced. The default weak learner is already a depth-1 tree (a stump), and scikit-learn finds exactly the same stumps and errors:</p>
+<pre class="code">
+import numpy as np
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+X = np.arange(1, 11).reshape(-1, 1)
+y = np.array([1, 1, 1, -1, -1, -1, 1, 1, 1, -1])
+
+ada = AdaBoostClassifier(estimator=DecisionTreeClassifier(max_depth=1),
+                         n_estimators=3, random_state=0).fit(X, y)
+
+print(ada.estimator_errors_)    # [0.3   0.2143 0.1818]  -> our three errors
+print(ada.estimator_weights_)   # [0.8473 1.2993 1.5041] -> exactly 2 x our alphas (0.424, 0.650, 0.752)
+print(ada.predict(X))           # [ 1  1  1 -1 -1 -1  1  1  1 -1]  -> all 10 right
+print(ada.score(X, y))          # 1.0
+</pre>
+<p>(scikit-learn's weights are twice the textbook α from this lesson, because it uses the multi-class "SAMME" formula, which for two classes equals ln((1 − err) ÷ err) without the ½. Doubling every weight changes no vote, so the predictions are identical.)</p>
+<p>A realistic run, on the breast-cancer data. The comments are from an actual run with scikit-learn 1.9.0; other versions and seeds may differ a little.</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import AdaBoostClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+stump = DecisionTreeClassifier(max_depth=1, random_state=42).fit(X_train, y_train)
+print(stump.score(X_test, y_test))                     # 0.923  one weak stump
+
+for n in [10, 50, 200]:
+    ada = AdaBoostClassifier(n_estimators=n, random_state=42).fit(X_train, y_train)
+    print(n, ada.score(X_train, y_train), ada.score(X_test, y_test))
+# 10   0.981  0.951
+# 50   1.000  0.965
+# 200  1.000  0.972     -> test accuracy keeps creeping up
+
+print(cross_val_score(AdaBoostClassifier(n_estimators=200, random_state=42), X, y, cv=5).mean())   # 0.977
+print(ada.feature_importances_.argmax())   # index of the most useful feature ("worst concave points" in this run)
+</pre>
+<p>On this dataset AdaBoost (97.2% test, 97.7% cross-validated) came out ahead of the random forest from the previous lesson (95.8% on the same split). Do not read that as "boosting always wins": on other data, or with noisy labels, the forest is often better. As a quick check I flipped 15% of the training labels at random and re-ran both with 200 estimators: AdaBoost fell to 89.5% and the forest to 91.6% on the clean test set (one seed only, so treat it as an illustration, not proof).</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>estimator</code></td><td>The weak learner. Default: a depth-1 tree. Try <code>DecisionTreeClassifier(max_depth=2 or 3)</code> for a stronger base. (Called <code>base_estimator</code> in old versions.)</td></tr>
+<tr><td><code>n_estimators</code></td><td>Maximum number of rounds (default 50). Boosting stops early if it reaches a perfect fit.</td></tr>
+<tr><td><code>learning_rate</code></td><td>Shrinks every stump's say (default 1.0). Smaller values need more <code>n_estimators</code> but usually generalise better.</td></tr>
+<tr><td><code>estimator_weights_</code>, <code>estimator_errors_</code></td><td>Each round's say and weighted error.</td></tr>
+<tr><td><code>feature_importances_</code></td><td>Which features the stumps chose most (weighted by their say).</td></tr>
+<tr><td><code>staged_score(X, y)</code></td><td>Accuracy after each round: handy for choosing <code>n_estimators</code>.</td></tr>
+<tr><td><code>AdaBoostRegressor</code></td><td>The regression version (AdaBoost.R2). Default base learner is a depth-3 tree. It re-weights points by how large their error is and predicts a weighted median.</td></tr>
+</table></div>
+<p>Two practical notes. AdaBoost needs <strong>no feature scaling</strong> (trees compare against thresholds). And the rounds are inherently sequential, so unlike a random forest it cannot train its trees in parallel.</p>
+
+<h2>5. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Turns very simple models into a strong, flexible classifier</td><td>Sensitive to noisy labels and outliers: it keeps raising their weights</td></tr>
+<tr><td>Few parameters to tune (rounds, learning rate, base depth)</td><td>Sequential: cannot be parallelised across rounds</td></tr>
+<tr><td>No scaling; works on mixed feature types once encoded</td><td>If the weak learner is too complex it overfits fast</td></tr>
+<tr><td>Fast to predict; small stumps are easy to inspect</td><td>Gradient Boosting and XGBoost (next lessons) are usually more accurate and more flexible</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🙂 Face detection</h4><p>The famous Viola-Jones detector in early digital cameras used AdaBoost to pick a few hundred simple image features out of tens of thousands, in a cascade fast enough for real time.</p></div>
+<div class="card"><h4>📞 Churn and response prediction</h4><p>Which customers will leave or answer an offer? Boosted stumps are a fast, decent baseline on tabular business data.</p></div>
+<div class="card"><h4>🧾 Credit and risk screening</h4><p>Combining many simple rules ("late payment?", "high utilisation?") into one weighted score.</p></div>
+<div class="card"><h4>🩺 Diagnosis support</h4><p>Boosted stumps over lab values give a score whose contributing features can be inspected.</p></div>
+<div class="card"><h4>🎓 A stepping stone</h4><p>The idea of "fit the next model to what the last one missed" is the seed of gradient boosting and XGBoost, which dominate modern tabular machine learning.</p></div>
+<div class="card"><h4>🔎 Feature selection</h4><p>Because each round picks a single best feature, the chosen features form a compact shortlist.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Boosting</strong> builds weak learners <em>sequentially</em>, each one focusing on the points the previous ones got wrong (by raising their weights).</li>
+<li>A stump's <strong>say</strong> is α = ½ ln((1 − error) ÷ error): large for accurate stumps, 0 for a coin flip, negative if worse than chance.</li>
+<li>Wrong points are multiplied by e<sup>α</sup>, right points by e<sup>−α</sup>, then everything is rescaled. After the update the last stump has exactly 50% weighted error, so the next one has to be different.</li>
+<li>The final answer is the <strong>sign of the α-weighted vote</strong>. In the worked example, three stumps at 70%, 70% and 60% accuracy classify all 10 points correctly.</li>
+<li>Boosting mostly reduces <strong>bias</strong> (bagging reduces variance). It is prone to <strong>overfitting noisy labels</strong>; use a smaller <code>learning_rate</code> and choose <code>n_estimators</code> by validation.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>A stump has a weighted error of 0.25. Compute its say α.</li>
+<li>What is α when the error is exactly 0.5? What does a negative α (error above 0.5) do to that stump's vote?</li>
+<li>Ten points start with weight 0.1 each. A stump with error 0.2 (two points wrong) has α = 0.693, so wrong points are multiplied by 2 and right points by 0.5. What are the new weights after rescaling? What do the two wrong points now add up to?</li>
+<li>Three stumps with says 0.42, 0.65 and 0.75 vote +, −, − for a new point. What is the total score and the predicted class?</li>
+<li>Bonus: run the breast-cancer code above. Use <code>staged_score</code> to plot the test accuracy after each round. Does it keep improving, or does it plateau? Then re-run with <code>learning_rate=0.1</code> and compare how many rounds you need.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> α = ½ ln(0.75 ÷ 0.25) = ½ ln 3 = ½ × 1.099 = <b>0.549</b>.</p>
+<p><b>2.</b> ln(1) = 0, so α = <b>0</b>: a coin-flip stump gets no say. If the error is above 0.5, α is negative, which <b>reverses</b> the stump's vote: a stump that is reliably wrong is as informative as one that is reliably right.</p>
+<p><b>3.</b> Raw weights: wrong points 0.1 × 2 = 0.2 each, right points 0.1 × 0.5 = 0.05 each. Total = 2 × 0.2 + 8 × 0.05 = 0.8. Rescaled: wrong points 0.2 ÷ 0.8 = <b>0.25</b> each, right points 0.05 ÷ 0.8 = <b>0.0625</b> each. The two wrong points now add up to <b>0.5</b>: half of all the weight, as always.</p>
+<p><b>4.</b> +0.42 − 0.65 − 0.75 = <b>−0.98</b> → predicted class <b>−</b>.</p>
+<p><b>5.</b> In the run above test accuracy kept creeping up (0.951 at 10 rounds, 0.965 at 50, 0.972 at 200). With a smaller learning rate you usually need several times more rounds for the same accuracy (in one run of mine, <code>learning_rate=0.5</code> with 200 rounds gave 0.958). Your exact curve may differ.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/adaboost.js"></script>
+</body>
+</html>

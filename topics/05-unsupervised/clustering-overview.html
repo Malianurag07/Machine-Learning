@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clustering Overview · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="cluster">
+<article id="lesson">
+
+<h1>Clustering Overview</h1>
+<p class="lede">So far every model had an answer key: a label to predict. In unsupervised learning there is no answer key. Clustering asks the data a different question: <em>"Which of these things belong together?"</em> This lesson covers what clustering is, how "similar" is measured, the main families of methods, and how to judge a result when nobody can tell you the right answer.</p>
+<div class="meta"><span class="chip">Beginner to intermediate</span><span class="chip plain">≈ 80 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: finding groups without labels</h2>
+<p>In <em>supervised</em> learning each training row comes with a target (spam or not, house price). In <strong>unsupervised learning</strong> the rows have only features, and the algorithm looks for structure by itself. The main jobs are:</p>
+<div class="tw"><table>
+<tr><th>Job</th><th>Question it answers</th><th>Lessons</th></tr>
+<tr><td><strong>Clustering</strong></td><td>Which rows form natural groups?</td><td>this one, K-Means, DBSCAN, Hierarchical</td></tr>
+<tr><td><strong>Dimensionality reduction</strong></td><td>Can I describe the data with fewer columns?</td><td>PCA, LDA</td></tr>
+<tr><td><strong>Association rules</strong></td><td>Which items occur together?</td><td>Association Rule Learning</td></tr>
+<tr><td>Anomaly detection</td><td>Which rows do not fit at all?</td><td>(a by-product of clustering such as DBSCAN's noise points)</td></tr>
+</table></div>
+<div class="callout analogy"><p><strong>Sorting a pile of unlabelled photos.</strong> Someone hands you 500 holiday photos with no captions and asks you to make piles. Nobody tells you the piles: you invent them. Photos of beaches go together, photos of food go together, and so on. You are using a sense of <em>similarity</em>, and you also decide <em>how many piles</em> to make. Two people may sort the same photos differently (by place, or by who is in them) and both can be "right". Clustering has exactly this character: a good result is one that is <em>useful and consistent</em>, not one that matches a hidden truth.</p></div>
+<p>Formally, a <strong>cluster</strong> is a group of points that are <strong>similar to each other and dissimilar to points in other groups</strong>. Everything in this lesson follows from two choices: how to measure similarity, and what "a group" should look like.</p>
+
+<h2>2. What does "similar" mean? Distance</h2>
+<p>Almost every clustering algorithm turns similarity into a <strong>distance</strong>: small distance = similar. The most common:</p>
+<div class="tw"><table>
+<tr><th>Distance</th><th>In words</th><th>For A = (1, 2) and B = (4, 6)</th></tr>
+<tr><td><strong>Euclidean</strong></td><td>the straight-line distance: square the gaps, add, take the square root</td><td>√(3² + 4²) = √25 = <b>5</b></td></tr>
+<tr><td><strong>Manhattan</strong></td><td>add up the gaps, like walking along city blocks</td><td>3 + 4 = <b>7</b></td></tr>
+<tr><td><strong>Cosine</strong></td><td>ignore length, compare the <em>direction</em> of the two vectors (popular for text)</td><td>angle between (1, 2) and (4, 6): cos ≈ 0.99, very similar direction</td></tr>
+</table></div>
+<p>(You met Euclidean and Manhattan distance in the KNN lesson.) Distance-based clustering has the same catch as KNN: <strong>the features' units decide who wins</strong>.</p>
+<h3>By hand: why scaling matters</h3>
+<p>Three customers described by <em>annual income in dollars</em> and a <em>spending score</em> from 0 to 100:</p>
+<div class="tw"><table>
+<tr><th>Customer</th><th class="num">Income ($)</th><th class="num">Spending score</th></tr>
+<tr><td>X</td><td class="num">40,000</td><td class="num">80</td></tr>
+<tr><td>Y</td><td class="num">41,000</td><td class="num">30</td></tr>
+<tr><td>Z</td><td class="num">52,000</td><td class="num">78</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Raw distances.</strong> X to Y: √(1000² + 50²) = √2,502,500 = <b>1001.2</b>. X to Z: √(12000² + 2²) = <b>12000.0</b>. So by raw distance Y looks 12 times closer to X than Z does, even though X and Y are 50 points apart in spending, a huge gap, while X and Z spend almost identically (80 vs 78). The spending score has been drowned out: dollars are numerically so much bigger than score points that the 50-point gap barely registers.</p>
+<p><strong>After min-max scaling</strong> (subtract the smallest value and divide by the range, so each feature runs from 0 to 1): income (40,000 → 0, 41,000 → 0.083, 52,000 → 1) and score (30 → 0, 78 → 0.96, 80 → 1). Then X = (0, 1), Y = (0.083, 0), Z = (1, 0.96):
+<br>X to Y: √(0.083² + 1²) = <b>1.003</b>. X to Z: √(1² + 0.04²) = <b>1.001</b>.
+<br>Now both features count equally, and the two distances are about equal, as they should be: Y is far in spending, Z is far in income.</p></div>
+<p>Rule: <strong>scale your features before distance-based clustering</strong> (StandardScaler or MinMaxScaler, from the Data Pre-processing lesson). Scaling does not decide <em>which</em> features matter; it just stops the units from deciding.</p>
+<div class="demo" data-title="Same customers, with and without scaling" id="demo-scale">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>There are three real customer groups (differing in both income and spending). Without scaling, K-Means cuts the plot into vertical slices by income only. With scaling, it finds the true groups. The "agreement" number is the <strong>adjusted Rand index</strong> (ARI): 1.0 means the clusters match the hidden groups exactly, about 0 means they match no better than random. (You only have such hidden groups in demos; in real life you usually don't, see section 5.)</p>
+
+<h2>3. The families of clustering methods</h2>
+<p>Different algorithms have different ideas of what a "group" is. Each has its own lesson coming up; here is the map.</p>
+<div class="tw"><table>
+<tr><th>Family</th><th>Idea of a cluster</th><th>Example</th><th>Good at</th><th>Struggles with</th></tr>
+<tr><td><strong>Centroid-based</strong></td><td>points closest to a centre ("centroid")</td><td>K-Means</td><td>round, similar-sized blobs; huge datasets</td><td>curved or elongated shapes, outliers, needs k</td></tr>
+<tr><td><strong>Density-based</strong></td><td>a dense region separated from other dense regions by sparse space</td><td>DBSCAN</td><td>any shape; finds outliers as "noise"; no k needed</td><td>clusters of very different density; high dimensions</td></tr>
+<tr><td><strong>Hierarchical</strong></td><td>a tree: each point starts alone and the closest groups merge step by step</td><td>Agglomerative clustering</td><td>seeing structure at every level (the dendrogram); small data</td><td>slow on large data; merges can't be undone</td></tr>
+<tr><td><strong>Distribution-based</strong></td><td>points drawn from overlapping bell-shaped (Gaussian) distributions</td><td>Gaussian Mixture Models</td><td>overlapping, elliptical clusters; gives probabilities of membership</td><td>needs assumptions about shape; can be unstable</td></tr>
+</table></div>
+<p>Try the three families on four data shapes. <strong>Blobs</strong> are easy for everyone. <strong>Moons</strong> and <strong>rings</strong> have curved clusters. <strong>Stretched</strong> clusters are long and thin. (These are quick miniature implementations: K-Means with a smart start, hierarchical clustering with "single linkage", and DBSCAN; the following lessons explain each properly.)</p>
+<div class="demo" data-title="Which method fits which shape?" id="demo-shapes">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Blobs + K-Means:</strong> perfect. This is the situation K-Means was designed for.</li>
+<li><strong>Moons or rings + K-Means:</strong> it cuts the shape in half with a straight boundary, because a K-Means cluster is always "the points nearest to one centre". Switch to DBSCAN or hierarchical (single link): they follow the curve.</li>
+<li><strong>DBSCAN's radius (eps):</strong> too small and everything becomes noise (grey ×); too large and separate groups merge into one. It is the one number you must tune.</li>
+<li><strong>Single-linkage hierarchical</strong> is happy with curves (moons and rings: perfect) but a single stray bridge of points can chain groups together. Try the stretched data: it scores about 0 because it peels off one or two stray points as tiny "clusters" and leaves everything else as one lump.</li>
+<li><strong>DBSCAN on the stretched stripes</strong> is sensitive: with the default eps it separates them on some random datasets and merges two stripes on others. Press "New random data" a few times and nudge eps. Any method that has one delicate setting needs that setting checked.</li>
+<li>There is no "best" algorithm: the right choice depends on the shape you expect, the size of the data and whether you know k.</li>
+</ul>
+
+<h2>4. How many clusters, and is this clustering any good?</h2>
+<p>Because there are no labels, "accuracy" does not exist. We use <em>internal</em> measures that look only at the data and the clusters.</p>
+<h3>Inertia and the elbow</h3>
+<p><strong>Inertia</strong> (also called within-cluster sum of squares, WCSS) adds up, for every point, the squared distance to its own cluster's centre. Tight clusters → small inertia. It always shrinks as you add clusters (with k = number of points it is 0), so you can't just minimise it. Instead, plot inertia against k and look for the <strong>elbow</strong>, where adding clusters stops helping much.</p>
+<h3>The silhouette score</h3>
+<p>The <strong>silhouette</strong> of one point compares two averages:</p>
+<ul>
+<li><b>a</b> = the average distance from the point to the <em>other members of its own cluster</em> (how snugly it fits in).</li>
+<li><b>b</b> = the average distance to the members of the <em>nearest other cluster</em> (how far the alternative is).</li>
+<li><b>silhouette = (b − a) ÷ the larger of a and b</b>, a number between −1 and +1: near +1 = clearly in the right cluster; near 0 = on the border; negative = probably in the wrong cluster.</li>
+</ul>
+<p>The <strong>silhouette score</strong> of a clustering is the average over all points. Higher is better. A rough rule of thumb: above 0.7 strong structure, 0.5 to 0.7 reasonable, 0.25 to 0.5 weak, below 0.25 hardly any structure.</p>
+<div class="callout math">
+<p><strong>By hand, seven points in two clusters.</strong></p>
+<div class="tw"><table>
+<tr><th>Point</th><td>P1</td><td>P2</td><td>P3</td><td>P4</td><td>P5</td><td>P6</td><td>P7</td></tr>
+<tr><th>(x, y)</th><td class="num">(1, 1)</td><td class="num">(2, 1)</td><td class="num">(1.5, 2)</td><td class="num">(4, 3)</td><td class="num">(6, 5)</td><td class="num">(7, 5)</td><td class="num">(6.5, 6)</td></tr>
+<tr><th>cluster</th><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>2</td><td>2</td></tr>
+</table></div>
+<p><strong>Inertia.</strong> Centre of cluster 1 = average of P1 to P4 = (2.125, 1.75); centre of cluster 2 = (6.5, 5.33). Squared distances to centre: cluster 1: P1 1.83, P2 0.58, P3 0.45, P4 5.08 → 7.94; cluster 2: P5 0.36, P6 0.36, P7 0.44 → 1.17. <b>Inertia = 7.94 + 1.17 = 9.10.</b> (If P4 is moved to cluster 2 instead, the inertia rises to 11.10, so the assignment above is the better one.)</p>
+<p><strong>Silhouette of P1.</strong> Distances from P1 to its cluster-mates: P2 = 1.00, P3 = 1.12, P4 = 3.61 → a = (1.00 + 1.12 + 3.61) ÷ 3 = <b>1.91</b>. Distances to cluster 2: P5 = 6.40, P6 = 7.21, P7 = 7.43 → b = <b>7.02</b>. Silhouette = (7.02 − 1.91) ÷ 7.02 = <b>0.73</b>.</p>
+<p><strong>Silhouette of P4</strong>, the point in the middle. To its cluster-mates P1, P2, P3: 3.61, 2.83, 2.69 → a = <b>3.04</b>. To cluster 2 (P5, P6, P7): 2.83, 3.61, 3.91 → b = <b>3.45</b>. Silhouette = (3.45 − 3.04) ÷ 3.45 = <b>0.12</b>, barely above 0: P4 sits on the border.</p>
+<p>All seven silhouettes: <b>0.73, 0.74, 0.73, 0.12, 0.79, 0.82, 0.82</b>. Average = <b>0.68</b>: a reasonable clustering, in which the one uncertain point (P4) is easy to spot.</p></div>
+<p>Play with both measures. The data always comes from 4 blobs; the question is whether the tools can tell:</p>
+<div class="demo" data-title="Elbow and silhouette: choosing k" id="demo-eval">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>Other ways to judge a clustering.</strong> (1) <em>If you happen to have true labels</em> (e.g. when benchmarking), compare with the <strong>adjusted Rand index</strong> or normalised mutual information. (2) <strong>Stability:</strong> cluster again on a random 80% of the data (or with different random starts); if the groups keep changing, they probably aren't real. (3) <strong>Usefulness:</strong> do the groups make sense to a domain expert? Do the "segments" behave differently on something you care about (revenue, churn)? A clustering that scores well but that nobody can act on has no value.</p></div>
+
+<h2>5. A practical workflow</h2>
+<ol>
+<li><strong>Clean and select features.</strong> Drop or encode text columns, handle missing values, remove features that carry no signal. Clustering is very sensitive to irrelevant features.</li>
+<li><strong>Scale</strong> the features (StandardScaler is a good default).</li>
+<li><strong>Pick an algorithm</strong> that matches the expected shape and size (section 3); start with K-Means as a baseline.</li>
+<li><strong>Choose the settings</strong> (k, or eps and min_samples) using elbow, silhouette and stability.</li>
+<li><strong>Profile the clusters:</strong> compute the average of each feature per cluster and give each cluster a human-readable name ("young high spenders", "cautious savers").</li>
+<li><strong>Use them:</strong> as marketing segments, as a new feature in a supervised model, to compress data, or to spot outliers.</li>
+</ol>
+
+<h2>6. Clustering in scikit-learn</h2>
+<p>Every scikit-learn clusterer has <code>fit</code>/<code>fit_predict</code> and produces <code>labels_</code>. Our seven-point example first: the silhouettes match the hand calculation.</p>
+<pre class="code">
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score, silhouette_samples
+
+P = np.array([[1, 1], [2, 1], [1.5, 2], [4, 3], [6, 5], [7, 5], [6.5, 6]])
+km = KMeans(n_clusters=2, n_init=10, random_state=0).fit(P)
+
+print(km.labels_)                 # [0 0 0 0 1 1 1]
+print(km.inertia_)                # 9.104...   (our 9.10)
+print(km.cluster_centers_)        # [[2.125 1.75 ] [6.5 5.333]]
+print(silhouette_samples(P, km.labels_).round(3))  # [0.728 0.737 0.727 0.117 0.791 0.82  0.817]
+print(silhouette_score(P, km.labels_))             # 0.6768
+</pre>
+<p>Scanning k on 300 points from four blobs (<code>make_blobs</code>). The output is from an actual run with scikit-learn 1.9.0; other versions may differ slightly.</p>
+<pre class="code">
+from sklearn.datasets import make_blobs
+
+X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=7)
+for k in range(2, 9):
+    m = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    print(k, round(m.inertia_, 1), round(silhouette_score(X, m.labels_), 3))
+# k   inertia  silhouette
+# 2   9027.1   0.594
+# 3   2503.3   0.766
+# 4    571.3   0.807   &lt;- best silhouette, and the inertia elbow (it drops 4x from k=3 to k=4 and then only slowly)
+# 5    511.1   0.707
+# 6    453.5   0.615
+# 7    400.2   0.487
+# 8    347.5   0.356
+</pre>
+<p>Both tools point to k = 4, the true number of blobs. On messier real data they often disagree, which is why you combine them with stability and common sense. Next, scaling and shapes. In the first script the "true" groups differ in both income and score; K-Means is scored against them with the adjusted Rand index:</p>
+<pre class="code">
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import adjusted_rand_score
+
+rs = np.random.RandomState(0)
+group = np.repeat([0, 1, 2], 50)
+income = np.r_[rs.normal(40000, 6000, 50), rs.normal(52000, 6000, 50), rs.normal(64000, 6000, 50)]
+score  = np.r_[rs.normal(25, 7, 50),       rs.normal(50, 7, 50),       rs.normal(75, 7, 50)]
+C = np.c_[income, score]
+
+raw    = KMeans(3, n_init=10, random_state=0).fit_predict(C)
+scaled = KMeans(3, n_init=10, random_state=0).fit_predict(StandardScaler().fit_transform(C))
+print(adjusted_rand_score(group, raw))      # 0.422   (income dominates)
+print(adjusted_rand_score(group, scaled))   # 0.921   (both features used)
+
+# shapes: two interleaved half-moons, ARI against the true moon labels
+from sklearn.cluster import DBSCAN, AgglomerativeClustering
+from sklearn.datasets import make_moons
+Xm, ym = make_moons(n_samples=300, noise=0.07, random_state=0)
+print(adjusted_rand_score(ym, KMeans(2, n_init=10, random_state=0).fit_predict(Xm)))             # 0.234
+print(adjusted_rand_score(ym, DBSCAN(eps=0.2, min_samples=5).fit_predict(Xm)))                   # 1.0
+print(adjusted_rand_score(ym, AgglomerativeClustering(2, linkage="single").fit_predict(Xm)))     # 1.0
+print(adjusted_rand_score(ym, AgglomerativeClustering(2, linkage="ward").fit_predict(Xm)))       # 0.399
+</pre>
+<div class="tw"><table>
+<tr><th>Tool</th><th>What it gives you</th></tr>
+<tr><td><code>KMeans(n_clusters=k, n_init=10)</code></td><td><code>labels_</code>, <code>cluster_centers_</code>, <code>inertia_</code>. Run several random starts (<code>n_init</code>) and keep the best.</td></tr>
+<tr><td><code>DBSCAN(eps, min_samples)</code></td><td><code>labels_</code> with <code>-1</code> meaning noise. No k needed.</td></tr>
+<tr><td><code>AgglomerativeClustering(n_clusters, linkage=...)</code></td><td>Hierarchical clustering; <code>linkage</code> is <code>"ward"</code>, <code>"complete"</code>, <code>"average"</code> or <code>"single"</code>.</td></tr>
+<tr><td><code>GaussianMixture(n_components)</code> (in <code>sklearn.mixture</code>)</td><td>Soft clusters: <code>predict_proba</code> gives the probability of each cluster.</td></tr>
+<tr><td><code>silhouette_score</code>, <code>silhouette_samples</code></td><td>Mean silhouette, or one value per point (to find the doubtful ones).</td></tr>
+<tr><td><code>davies_bouldin_score</code>, <code>calinski_harabasz_score</code></td><td>Other internal measures (lower is better for Davies-Bouldin, higher for Calinski-Harabasz).</td></tr>
+<tr><td><code>adjusted_rand_score</code>, <code>normalized_mutual_info_score</code></td><td>Compare against true labels when you have them (benchmarks, not everyday use).</td></tr>
+</table></div>
+
+<h2>7. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Needs no labels: works on data nobody has annotated</td><td>No single right answer: results depend on the algorithm, features, scaling and k</td></tr>
+<tr><td>Reveals structure and outliers you didn't know to look for</td><td>Hard to validate: the internal scores are hints, not proof</td></tr>
+<tr><td>Cluster labels can become useful features for other models</td><td>Sensitive to irrelevant features and to units (scale!)</td></tr>
+<tr><td>Fast baselines exist even for millions of rows</td><td>Distances become less meaningful in very high dimensions (see PCA)</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🛍️ Customer segmentation</h4><p>Group customers by behaviour, then design offers per segment. The classic use.</p></div>
+<div class="card"><h4>📰 Grouping documents</h4><p>News articles or support tickets clustered by topic, so people can browse or route them.</p></div>
+<div class="card"><h4>🎨 Colour quantisation</h4><p>Cluster the pixels of an image into 16 colours to shrink the file: each cluster centre becomes a palette colour.</p></div>
+<div class="card"><h4>🧬 Genes and cells</h4><p>Cluster gene-expression profiles to find cell types or diseases with similar signatures.</p></div>
+<div class="card"><h4>🚨 Fraud and anomalies</h4><p>Transactions that fall in no dense cluster are candidates for review.</p></div>
+<div class="card"><h4>🗺️ Geography</h4><p>Cluster GPS pickups to find hot-spots for ride-share stations or store locations.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Clustering</strong> = grouping unlabelled rows so that points in a group are similar and points in different groups are not. There is no answer key.</li>
+<li>Similarity is a <strong>distance</strong> (Euclidean by default). Units decide the result, so <strong>scale first</strong>: in our example raw distances said 1001 vs 12000, scaled distances said 1.003 vs 1.001.</li>
+<li>Families: <strong>centroid</strong> (K-Means), <strong>density</strong> (DBSCAN), <strong>hierarchical</strong> (agglomerative), <strong>distribution</strong> (Gaussian mixtures). Each assumes a different cluster shape: K-Means fails on curved clusters that DBSCAN handles.</li>
+<li><strong>Inertia</strong> always falls as k grows: look for the <strong>elbow</strong>. <strong>Silhouette</strong> = (b − a) ÷ max(a, b) per point (our example averages 0.68) and is highest for the best k.</li>
+<li>Also judge by <strong>stability</strong> and <strong>usefulness</strong>: a cluster you can't name or act on is probably not worth keeping.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Compute the Euclidean and Manhattan distance between (2, 3) and (5, 7).</li>
+<li>Customers are described by age (20 to 60) and salary ($20,000 to $200,000). Which feature will dominate an unscaled distance, and what would you do about it?</li>
+<li>A cluster contains the one-dimensional points 1, 3 and 5. What is its centre and its inertia?</li>
+<li>A point has average distance a = 2 to its own cluster and b = 6 to the nearest other cluster. What is its silhouette? What if a = 5 and b = 4?</li>
+<li>Silhouette scores for k = 2, 3, 4 are 0.55, 0.71, 0.62. Which k do you pick, and what else would you check?</li>
+<li>Bonus: run the scaling code above with <code>random_state=1</code> in <code>RandomState</code> and compare the two ARIs.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Gaps are 3 and 4: Euclidean = √(9 + 16) = <b>5</b>; Manhattan = 3 + 4 = <b>7</b>.</p>
+<p><b>2.</b> <b>Salary</b> dominates: its range is thousands of times larger than age's. Standardise (or min-max scale) both features first.</p>
+<p><b>3.</b> Centre = (1 + 3 + 5) ÷ 3 = <b>3</b>. Inertia = (1 − 3)² + (3 − 3)² + (5 − 3)² = 4 + 0 + 4 = <b>8</b>.</p>
+<p><b>4.</b> (6 − 2) ÷ 6 = <b>0.67</b>: well placed. With a = 5, b = 4: (4 − 5) ÷ 5 = <b>−0.2</b>: negative, so the point is probably in the wrong cluster (it is closer, on average, to the neighbouring one).</p>
+<p><b>5.</b> <b>k = 3</b> (highest silhouette). Also check the inertia elbow, whether the clusters are stable when the data or the random start changes, and whether the three groups make sense to a domain expert.</p>
+<p><b>6.</b> Expect a big gap again: the raw run is dragged by income and scores well below the scaled run. In my check with seed 1 the two ARIs were about <b>0.557</b> (raw) and <b>0.901</b> (scaled); across seeds 0 to 3 the raw runs scored 0.42 to 0.56 and the scaled runs 0.83 to 0.92.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/clustering-overview.js"></script>
+</body>
+</html>

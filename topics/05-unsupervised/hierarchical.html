@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierarchical Clustering · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="hier">
+<article id="lesson">
+
+<h1>Hierarchical Clustering</h1>
+<p class="lede">Instead of committing to one number of clusters, hierarchical clustering builds a whole <em>family tree</em> of them. Start with every point alone, keep merging the two closest groups, and record every merge. The result, a tree called a <strong>dendrogram</strong>, lets you choose how many clusters you want <em>after</em> the fact, just by cutting it at a height.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 80 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: merge the closest, over and over</h2>
+<div class="callout analogy"><p><strong>Building a family tree of languages, or companies merging.</strong> Imagine every small company in a city as its own group. Each year the two most similar (closest) companies merge into one. After a few years you have some mid-sized groups, and eventually a single giant company. If you wrote down <em>which</em> groups merged and <em>how far apart they were</em> when they did, you would have a complete history. Want to know the "natural groupings" at some level of detail? Go back to the moment when there were 3 companies left. Biologists build exactly such trees to classify species; the "tree of life" is a dendrogram.</p></div>
+<h3>Agglomerative clustering (bottom-up)</h3>
+<ol>
+<li>Start with <b>n clusters</b>: every point is its own cluster.</li>
+<li>Find the <b>two closest clusters</b> and merge them into one.</li>
+<li>Repeat step 2 until only <b>one</b> cluster (containing everything) is left.</li>
+<li>Draw the merges as a tree: each merge is a horizontal bar whose <b>height</b> is the distance at which the merge happened.</li>
+</ol>
+<p>(There is also a <em>divisive</em> version that goes top-down, splitting one big cluster repeatedly. It is rarer; scikit-learn and SciPy provide the agglomerative one, which is what "hierarchical clustering" normally means.)</p>
+<p>No random start, no k to choose in advance: the tree is completely determined by the data, the distance measure and one more choice: how to measure the distance <em>between two clusters</em>.</p>
+
+<h2>2. Linkage: how far apart are two clusters?</h2>
+<p>Distance between two points is clear (Euclidean, as before). But once clusters contain several points, "the distance between cluster X and cluster Y" needs a rule, called the <strong>linkage</strong>:</p>
+<div class="tw"><table>
+<tr><th>Linkage</th><th>Distance between two clusters =</th><th>Tends to produce</th></tr>
+<tr><td><strong>Single</strong></td><td>the <em>smallest</em> distance between a point in one and a point in the other ("nearest neighbours")</td><td>long, snake-like clusters; can follow curves; prone to <em>chaining</em> through a bridge of points</td></tr>
+<tr><td><strong>Complete</strong></td><td>the <em>largest</em> distance between any two points, one from each ("farthest neighbours")</td><td>compact, similar-sized clusters; sensitive to outliers</td></tr>
+<tr><td><strong>Average</strong></td><td>the <em>mean</em> of all pairwise distances between the two clusters</td><td>a compromise between single and complete</td></tr>
+<tr><td><strong>Ward</strong></td><td>how much the total within-cluster squared spread (the inertia from K-Means) would <em>increase</em> if the two clusters were merged</td><td>compact, roughly round and equal-sized clusters, like K-Means; often the best default</td></tr>
+</table></div>
+<h3>By hand: seven points on a line</h3>
+<p>Points at x = <b>0, 1, 2.1, 3.3, 4.6, 8, 8.5</b>. Call them A, B, C, D, E, F, G. To feel the difference between linkages: A to E form a "chain" with gaps of about 1 to 1.3, and F, G are a close pair far away.</p>
+<div class="callout math">
+<p><strong>Single linkage.</strong></p>
+<ol>
+<li>The closest pair of points is F and G (0.5): merge → {F,G} at height <b>0.5</b>.</li>
+<li>Next closest: A and B (1.0) → {A,B} at <b>1.0</b>.</li>
+<li>Now compare all cluster distances (the smallest gap between members). {A,B} to C: 2.1 − 1 = 1.1; C to D: 1.2; D to E: 1.3. The smallest is 1.1 → {A,B,C} at <b>1.1</b>.</li>
+<li>{A,B,C} to D: 3.3 − 2.1 = 1.2 → {A,B,C,D} at <b>1.2</b>.</li>
+<li>{A,B,C,D} to E: 4.6 − 3.3 = 1.3 → {A,…,E} at <b>1.3</b>.</li>
+<li>Finally {A,…,E} to {F,G}: the nearest members are E and F: 8 − 4.6 = 3.4 → everything merged at <b>3.4</b>.</li>
+</ol>
+<p><strong>Complete linkage</strong> (farthest members). Steps 1 and 2 are identical (0.5 and 1.0). Step 3: {A,B} to C is now the <em>larger</em> gap, 2.1 − 0 = 2.1; so the closest pair is C and D at <b>1.2</b> → {C,D}. Step 4: {C,D} to E: max(4.6 − 2.1, 4.6 − 3.3) = 2.5; {A,B} to {C,D}: 3.3 − 0 = 3.3; so → {C,D,E} at <b>2.5</b>. Step 5: {A,B} to {C,D,E}: 4.6 − 0 = 4.6 → {A,…,E} at <b>4.6</b>. Step 6: to {F,G}: 8.5 − 0 = 8.5 → <b>8.5</b>.</p>
+<p><strong>Average linkage</strong> at step 4: {C,D} to E: average of 2.5 and 1.3 = <b>1.9</b>. Step 5: {A,B} to {C,D,E}: the six distances are 2.1, 3.3, 4.6, 1.1, 2.3, 3.6, average = 17 ÷ 6 = <b>2.83</b>. Step 6: the ten distances between {A,…,E} and {F,G} add up to 60.5, average = <b>6.05</b>.</p>
+<p><strong>Ward linkage</strong>, step 4 in detail. Merging {C,D} (centre 2.7) with E (4.6): the increase in squared spread is (2 × 1 ÷ 3) × (4.6 − 2.7)² = 0.667 × 3.61 = 2.41. It is reported on the height scale as √(2 × 2.41) = <b>2.19</b> (that is the scale SciPy uses, chosen so that merging two single points gives their ordinary distance).</p></div>
+<div class="tw"><table>
+<tr><th>Merge</th><th>Single</th><th>Complete</th><th>Average</th><th>Ward</th></tr>
+<tr><td>1</td><td>{F,G} at 0.5</td><td>{F,G} at 0.5</td><td>{F,G} at 0.5</td><td>{F,G} at 0.5</td></tr>
+<tr><td>2</td><td>{A,B} at 1.0</td><td>{A,B} at 1.0</td><td>{A,B} at 1.0</td><td>{A,B} at 1.0</td></tr>
+<tr><td>3</td><td><b>{A,B,C}</b> at 1.1</td><td><b>{C,D}</b> at 1.2</td><td>{C,D} at 1.2</td><td>{C,D} at 1.2</td></tr>
+<tr><td>4</td><td>{A,B,C,D} at 1.2</td><td>{C,D,E} at 2.5</td><td>{C,D,E} at 1.9</td><td>{C,D,E} at 2.19</td></tr>
+<tr><td>5</td><td>{A,…,E} at 1.3</td><td>{A,…,E} at 4.6</td><td>{A,…,E} at 2.83</td><td>{A,…,E} at 4.39</td></tr>
+<tr><td>6</td><td>all at 3.4</td><td>all at 8.5</td><td>all at 6.05</td><td>all at 10.23</td></tr>
+<tr><td>Cut into 3 clusters</td><td>{A,B,C,D} · {E} · {F,G}</td><td>{A,B} · {C,D,E} · {F,G}</td><td>{A,B} · {C,D,E} · {F,G}</td><td>{A,B} · {C,D,E} · {F,G}</td></tr>
+</table></div>
+<p>All four agree on two clusters: {A,…,E} and {F,G}. But look at single linkage: it glued the chain together <em>one point at a time</em> at nearly the same height (1.1, 1.2, 1.3): each point is close to its neighbour, so the chain never breaks. That is <strong>chaining</strong>, both the strength (it follows a curved line) and the weakness (a thin bridge joins two groups). Step through it, and press the linkage button to compare:</p>
+<div class="demo" data-title="Merging pair by pair" id="demo-build">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>3. Reading the dendrogram and choosing the number of clusters</h2>
+<ul>
+<li><strong>Leaves</strong> at the bottom are the individual points. Each <strong>U-shaped bar</strong> is a merge; its height is the distance between the two clusters when they merged.</li>
+<li><strong>Cut</strong> the tree with a horizontal line at some height. Every vertical line the cut crosses is one cluster (everything hanging below it). Cutting low gives many small clusters; cutting high gives a few large ones.</li>
+<li><strong>Long vertical lines</strong> mean "these groups were far apart when they finally merged", which suggests they are real, distinct clusters. A good cut is in the middle of the <em>largest gap</em> between successive merge heights.</li>
+</ul>
+<div class="demo" data-title="Cut the tree" id="demo-cut">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Drag the cut height: with the Ward linkage on three blobs, the clusters below the cut stay coloured, and the number of clusters changes as you cross merge heights. The three natural clusters correspond to the big empty vertical stretch near the top.</p>
+<p>Ways to decide where to cut: the largest-gap rule above; the <strong>silhouette score</strong> for each k (overview lesson); or a real-world requirement ("we need 5 customer segments"). On the iris flowers with Ward linkage, the last five merge heights are 3.83, 4.85, 6.4, 12.3 and 32.45 (I ran this): the biggest jump is at the very top (12.3 → 32.45, suggesting 2 clusters) and the next largest is 6.4 → 12.3 (suggesting 3, matching the three species).</p>
+
+<h2>4. Which linkage for which shape?</h2>
+<p>The same data, four linkages, and four kinds of shapes. The bridge data is two blobs joined by a thin line of points.</p>
+<div class="demo" data-title="Linkage on different shapes" id="demo-link">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="tw"><table>
+<tr><th>Shape</th><th>Works well</th><th>Fails</th></tr>
+<tr><td>Round blobs, maybe unequal spread</td><td><b>Ward</b> (the most consistent in my tests); average and complete work on some datasets</td><td>single (chains through the sparse region or peels off stray points: about 0 in the blobs demo on most seeds)</td></tr>
+<tr><td>Curved shapes (moons, rings)</td><td><b>Single</b></td><td>Ward, complete, average: they cut the shapes into round chunks</td></tr>
+<tr><td>Blobs joined by a thin bridge or with outliers</td><td>Ward, complete</td><td>single (merges everything through the bridge)</td></tr>
+</table></div>
+<p>Numbers from scikit-learn (adjusted Rand index against the true groups, 1.0 = perfect). Two half-moons (300 points): single <b>1.0</b>, average 0.52, Ward 0.40, complete 0.26. Three blobs of different spread (300 points): Ward <b>0.93</b>, complete 0.74, single 0.57, average 0.57. Iris (three species): average 0.76, Ward 0.73, complete 0.64, single 0.56, where single linkage makes clusters of size 50, 2 and 98 (a typical chained result), while Ward gives 50, 36 and 64. No linkage wins everywhere: <strong>Ward is a good default for blob-like data, single linkage for curved structure.</strong></p>
+
+<h2>5. Practical notes</h2>
+<ul>
+<li><strong>Scale your features</strong> first: linkage relies on distances just like K-Means and DBSCAN.</li>
+<li><strong>Cost:</strong> the algorithm needs the distance between every pair of points, so memory and time grow at least with n². It is comfortable for thousands of points, painful for hundreds of thousands. For very large data use K-Means or MiniBatchKMeans first, then hierarchical clustering on the resulting centroids.</li>
+<li><strong>Merges are permanent:</strong> once two points are joined, a later, better idea can't separate them (unlike K-Means, which reassigns points each round). A bad early merge stays.</li>
+<li><strong>Deterministic:</strong> same data and settings give the same tree every time (no random starts).</li>
+<li><strong>Ward needs Euclidean distances.</strong> The other linkages accept other metrics (Manhattan, cosine, or a precomputed distance matrix).</li>
+<li><strong>Heat-map clustering:</strong> biology and finance often cluster both the rows and the columns of a table and display the dendrograms beside a colour-coded heat-map (for example seaborn's <code>clustermap</code>).</li>
+</ul>
+
+<h2>6. Hierarchical clustering in Python</h2>
+<p>SciPy builds the full merge table (and the dendrogram); scikit-learn's <code>AgglomerativeClustering</code> returns labels for a chosen k or cut height. Our seven points (SciPy's merge table reproduces the heights above):</p>
+<pre class="code">
+import numpy as np
+from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+from sklearn.cluster import AgglomerativeClustering
+
+x = np.array([0, 1, 2.1, 3.3, 4.6, 8, 8.5]).reshape(-1, 1)
+
+for method in ("single", "complete", "average", "ward"):
+    Z = linkage(x, method=method)        # each row: [cluster a, cluster b, height, size of the new cluster]
+    print(method, Z[:, 2].round(2))
+# single   [0.5  1.   1.1  1.2  1.3  3.4 ]
+# complete [0.5  1.   1.2  2.5  4.6  8.5 ]
+# average  [0.5  1.   1.2  1.9  2.83 6.05]
+# ward     [0.5  1.   1.2  2.19 4.39 10.23]
+
+Z = linkage(x, method="single")
+print(fcluster(Z, t=3, criterion="maxclust"))       # [2 2 2 2 3 1 1]  -> {A,B,C,D} {E} {F,G}
+Z = linkage(x, method="complete")
+print(fcluster(Z, t=3, criterion="maxclust"))       # [2 2 3 3 3 1 1]  -> {A,B} {C,D,E} {F,G}
+
+print(AgglomerativeClustering(n_clusters=2, linkage="complete").fit_predict(x))   # [0 0 0 0 0 1 1]
+
+# drawing the tree (needs matplotlib; I did not render it here):
+#   import matplotlib.pyplot as plt; dendrogram(Z); plt.show()
+</pre>
+<p>Now on real data: iris, Ward linkage, cut by a distance threshold instead of a number of clusters. (Outputs are from an actual run with SciPy and scikit-learn 1.9.0; other versions may differ slightly.)</p>
+<pre class="code">
+from sklearn.datasets import load_iris
+from sklearn.metrics import adjusted_rand_score
+
+X, y = load_iris(return_X_y=True)
+
+Z = linkage(X, method="ward")
+print(Z[-5:, 2].round(2))                          # [ 3.83  4.85  6.4  12.3  32.45 ]  the top five merge heights
+print(np.bincount(fcluster(Z, 3, "maxclust"))[1:]) # [50 36 64]   cluster sizes for k=3
+
+model = AgglomerativeClustering(n_clusters=None, distance_threshold=7, linkage="ward").fit(X)
+print(model.n_clusters_)                           # 3   (a cut at height 7 crosses 3 vertical lines)
+
+for method in ("single", "complete", "average", "ward"):
+    labels = AgglomerativeClustering(n_clusters=3, linkage=method).fit_predict(X)
+    print(method, round(adjusted_rand_score(y, labels), 3))
+# single 0.564 | complete 0.642 | average 0.759 | ward 0.731
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter / function</th><th>What it does</th></tr>
+<tr><td><code>n_clusters</code></td><td>Cut the tree so that exactly this many clusters remain (or <code>None</code> when you use a threshold).</td></tr>
+<tr><td><code>distance_threshold</code></td><td>Cut the tree at this height instead (requires <code>n_clusters=None</code>).</td></tr>
+<tr><td><code>linkage</code></td><td><code>"ward"</code> (default), <code>"complete"</code>, <code>"average"</code>, <code>"single"</code>.</td></tr>
+<tr><td><code>metric</code></td><td>Distance between points (default Euclidean; <code>"precomputed"</code> to pass a distance matrix). Ward requires Euclidean.</td></tr>
+<tr><td><code>connectivity</code></td><td>Optional graph saying which points may be merged (for example only neighbouring pixels or regions): keeps clusters local and speeds things up.</td></tr>
+<tr><td><code>labels_</code>, <code>children_</code>, <code>distances_</code></td><td>Cluster labels, the merge tree, and the merge heights (with a threshold or <code>compute_distances=True</code>).</td></tr>
+<tr><td><code>scipy.cluster.hierarchy.linkage</code>, <code>fcluster</code>, <code>dendrogram</code></td><td>Build the merge table, cut it (by number of clusters or by height), and draw the dendrogram.</td></tr>
+</table></div>
+
+<h2>7. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>No need to pick k up front: the dendrogram shows structure at every level</td><td>Memory and time grow roughly with n²: not for very large data</td></tr>
+<tr><td>Deterministic and no random starts</td><td>Merges can't be undone; sensitive to noise and outliers (depends on the linkage)</td></tr>
+<tr><td>Different linkages suit different shapes; can follow curves (single)</td><td>Each linkage has its own weakness: chaining (single), splitting big clusters (complete/Ward)</td></tr>
+<tr><td>The tree is a natural picture for scientists (taxonomies, heat-maps)</td><td>No <code>predict</code> for new points; choosing the cut still needs judgement</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🧬 Genes and species</h4><p>Cluster gene-expression profiles or DNA sequences and draw the tree next to a heat-map: the standard picture in bioinformatics and phylogenetics.</p></div>
+<div class="card"><h4>📰 Document taxonomies</h4><p>Group articles or products into a hierarchy (topics, sub-topics), letting readers drill down.</p></div>
+<div class="card"><h4>🛍️ Customer segments at several levels</h4><p>See both the 3 broad segments and the 12 finer ones from the same tree.</p></div>
+<div class="card"><h4>🖼️ Image segmentation</h4><p>Merge neighbouring similar pixels or regions into objects, using the <code>connectivity</code> option.</p></div>
+<div class="card"><h4>🏦 Finance</h4><p>Cluster assets by the correlation of their returns to build diversified portfolios: assets far apart in the tree diversify each other.</p></div>
+<div class="card"><h4>🔗 A step before other methods</h4><p>Use the dendrogram to decide k, then run K-Means with that k.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Agglomerative clustering</strong> starts with every point alone and repeatedly merges the two closest clusters; the merge history is the <strong>dendrogram</strong>. Cut it at a height to get any number of clusters.</li>
+<li>The <strong>linkage</strong> defines "distance between clusters": <em>single</em> = nearest members, <em>complete</em> = farthest, <em>average</em> = mean of all pairs, <em>Ward</em> = smallest increase in within-cluster spread.</li>
+<li>On our 7 points the merge heights were single 0.5/1.0/1.1/1.2/1.3/3.4, complete 0.5/1.0/1.2/2.5/4.6/8.5: single linkage <strong>chains</strong> along a line of points; complete and Ward form compact groups.</li>
+<li>Choose the cut in the middle of the <strong>largest gap</strong> between merge heights, or with the silhouette. Ward is a good default for round blobs, single for curved shapes (but beware bridges and outliers).</li>
+<li>Scale features first; it is deterministic but costs at least n² memory; merges are never undone.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Points at x = 1, 3 and 8. Do agglomerative clustering with single, complete and average linkage. At what heights do the two merges happen for each?</li>
+<li>Clusters {1, 2} and {6, 9}: what is the single, complete and average linkage distance between them?</li>
+<li>A complete-linkage dendrogram has merge heights 0.5, 1.0, 1.2, 2.5, 4.6, 8.5 (the example above). How many clusters do you get by cutting at height 3.0? At 6.0?</li>
+<li>You want to cluster the two half-moons. Which linkage would you try first, and what risk does it carry?</li>
+<li>Bonus: run the iris code and print the cluster sizes for <code>linkage="single"</code> with 3 clusters. What do you notice?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> First merge: 1 and 3 (distance 2) for every linkage, at height <b>2</b>. Second merge (the cluster {1,3} with 8): single = smallest gap = 8 − 3 = <b>5</b>; complete = largest gap = 8 − 1 = <b>7</b>; average = (7 + 5) ÷ 2 = <b>6</b>.</p>
+<p><b>2.</b> Distances between members: 1→6 = 5, 1→9 = 8, 2→6 = 4, 2→9 = 7. Single = smallest = <b>4</b>; complete = largest = <b>8</b>; average = (5 + 8 + 4 + 7) ÷ 4 = <b>6</b>.</p>
+<p><b>3.</b> The cut at 3.0 keeps the merges at 0.5, 1.0, 1.2 and 2.5 (four merges), so 7 − 4 = <b>3 clusters</b>. At 6.0 it also keeps the merge at 4.6 (five merges): 7 − 5 = <b>2 clusters</b>.</p>
+<p><b>4.</b> <b>Single linkage</b> (in my test it recovered the moons perfectly, ARI 1.0). The risk is chaining: a thin bridge of points, or outliers, can merge groups or produce tiny clusters.</p>
+<p><b>5.</b> The sizes are very uneven: in my run, <b>50, 2 and 98</b>. Single linkage peeled off two stray points as their own cluster and lumped the two overlapping species together: chaining.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/hierarchical.js"></script>
+</body>
+</html>

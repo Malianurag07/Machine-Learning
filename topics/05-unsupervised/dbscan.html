@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DBSCAN · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="dbscan">
+<article id="lesson">
+
+<h1>DBSCAN</h1>
+<p class="lede">K-Means asks "which centre is nearest?" DBSCAN asks a different question: <em>"is this point in a crowd?"</em> Clusters are crowded regions separated by empty space. They can have any shape, and points that stand alone are labelled <strong>noise</strong> instead of being forced into a cluster. You do not tell it how many clusters to find.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 80 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: clusters are crowds</h2>
+<div class="callout analogy"><p><strong>A festival seen from above at night.</strong> People gather in crowds: in front of the stages, around the food trucks. Between the crowds there is open field, with a few people wandering alone. You can recognise a crowd without knowing how many there are or what shape they form: it is any place where, standing next to a person, you can always find <em>several other people within arm's reach</em>, and then several more within reach of those, and so on. A crowd can wind around the field like a snake. The people wandering alone are not part of any crowd. That is DBSCAN: <em>density-Based Spatial Clustering of Applications with Noise</em>.</p></div>
+<p>DBSCAN needs only two settings:</p>
+<div class="tw"><table>
+<tr><th>Setting</th><th>Meaning</th><th>In the analogy</th></tr>
+<tr><td><code>eps</code> (ε, epsilon)</td><td>The radius of a point's neighbourhood</td><td>How far "arm's reach" is</td></tr>
+<tr><td><code>min_samples</code></td><td>How many points (<em>including the point itself</em>) must lie within <code>eps</code> for the area to count as crowded</td><td>How many people make a crowd</td></tr>
+</table></div>
+<p>With these, every point gets one of three roles:</p>
+<div class="tw"><table>
+<tr><th>Role</th><th>Definition</th></tr>
+<tr><td><strong>Core point</strong></td><td>has at least <code>min_samples</code> points within <code>eps</code> (itself included): it is in the middle of a crowd</td></tr>
+<tr><td><strong>Border point</strong></td><td>is <em>not</em> a core point, but lies within <code>eps</code> of a core point: on the edge of a crowd</td></tr>
+<tr><td><strong>Noise point</strong></td><td>neither: it is alone</td></tr>
+</table></div>
+<h3>The algorithm</h3>
+<ol>
+<li>Take an unvisited point and count the points within <code>eps</code> of it.</li>
+<li>If it is <strong>not a core point</strong>, mark it noise for now (a later cluster may still claim it as a border point) and move on.</li>
+<li>If it <strong>is a core point</strong>, start a new cluster. Put all its neighbours in the cluster too, then examine each of those neighbours: whenever a neighbour is <em>also</em> a core point, add <em>its</em> neighbours as well. The cluster grows like a chain reaction through overlapping dense neighbourhoods and stops when it reaches only border points and empty space.</li>
+<li>Repeat with the next unvisited point until every point has been visited.</li>
+</ol>
+<p>Two points are in the same cluster if you can get from one to the other by hopping between core points that are less than <code>eps</code> apart. That chain-hopping is what lets DBSCAN follow curves that K-Means cannot.</p>
+
+<h2>2. DBSCAN by hand</h2>
+<p>Twelve points, with <code>eps = 1.0</code> and <code>min_samples = 3</code>. The distance is the ordinary straight-line distance.</p>
+<div class="tw"><table>
+<tr><th>Point</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td></tr>
+<tr><th>x</th><td class="num">1.0</td><td class="num">1.6</td><td class="num">2.2</td><td class="num">2.9</td><td class="num">3.6</td><td class="num">6.0</td><td class="num">6.5</td><td class="num">7.1</td><td class="num">6.6</td><td class="num">4.5</td><td class="num">9.0</td><td class="num">3.6</td></tr>
+<tr><th>y</th><td class="num">1.0</td><td class="num">1.4</td><td class="num">1.1</td><td class="num">1.6</td><td class="num">2.1</td><td class="num">5.0</td><td class="num">5.6</td><td class="num">5.2</td><td class="num">4.5</td><td class="num">5.0</td><td class="num">1.5</td><td class="num">3.6</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Step 1: find every point's neighbours.</strong> Distance between points 1 and 2: √(0.6² + 0.4²) = √0.52 = 0.72 ≤ 1.0: neighbours. Between 2 and 3: √(0.6² + 0.3²) = 0.67; between 3 and 4: √(0.7² + 0.5²) = 0.86; between 4 and 5: 0.86. On the right: 6–7: 0.78, 7–8: 0.72, 6–9: 0.78, 8–9: 0.86. (Points 7 and 9 are 1.10 apart, just out of reach.) Every other pair is farther than 1.0.</p>
+<div class="tw"><table>
+<tr><th>Point</th><th>Neighbours within 1.0 (itself included)</th><th class="num">Count</th><th>Role (need 3)</th></tr>
+<tr><td>1</td><td>1, 2</td><td class="num">2</td><td>not core</td></tr>
+<tr><td>2</td><td>1, 2, 3</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>3</td><td>2, 3, 4</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>4</td><td>3, 4, 5</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>5</td><td>4, 5</td><td class="num">2</td><td>not core</td></tr>
+<tr><td>6</td><td>6, 7, 9</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>7</td><td>6, 7, 8</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>8</td><td>7, 8, 9</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>9</td><td>6, 8, 9</td><td class="num">3</td><td><b>core</b></td></tr>
+<tr><td>10, 11, 12</td><td>only themselves</td><td class="num">1</td><td>not core</td></tr>
+</table></div>
+<p><strong>Step 2: grow the clusters.</strong> Start at point 1: not core, mark it as noise for now. Point 2 is core: <b>cluster 1</b> starts, and its neighbours 1 and 3 join. Point 1 is rescued from noise, but as a non-core point it does not spread further: a <b>border point</b>. Point 3 is core: its neighbour 4 joins. Point 4 is core: its neighbour 5 joins, and 5 is a border point. The chain 2 → 3 → 4 stops at 1 and 5. Then points 6 to 9 form <b>cluster 2</b> in the same way (all four are core). Points 10, 11 and 12 have no neighbours: <b>noise</b>.</p>
+<p><strong>Result:</strong> cluster 1 = {1, 2, 3, 4, 5} (core 2, 3, 4; border 1, 5), cluster 2 = {6, 7, 8, 9} (all core), noise = {10, 11, 12}. Point 5 is 3.4 units from point 1, much farther apart than <code>eps</code>: they are in the same cluster only because of the chain 1–2–3–4–5.</p></div>
+<h3>What changes with the settings?</h3>
+<div class="tw"><table>
+<tr><th>Setting</th><th>Result on these 12 points</th></tr>
+<tr><td><code>eps = 0.5</code>, min_samples 3</td><td>No point has two neighbours that close: <b>everything is noise</b>, 0 clusters.</td></tr>
+<tr><td><code>eps = 1.0</code>, min_samples 3</td><td><b>2 clusters</b>, 3 noise points (above).</td></tr>
+<tr><td><code>eps = 1.6</code>, min_samples 3</td><td>The reach is now long enough for point 10 to join cluster 2 and for point 12 to join cluster 1. <b>2 clusters</b>, only point 11 is noise.</td></tr>
+<tr><td><code>eps = 2.0</code>, min_samples 3</td><td>Points 10 and 12 are now core points that bridge the gap between the crowds: <b>one merged cluster</b>, point 11 is noise.</td></tr>
+<tr><td><code>eps = 1.0</code>, min_samples 4</td><td>No point has 4 within reach (the maximum is 3): everything is noise.</td></tr>
+<tr><td><code>eps = 1.0</code>, min_samples 2</td><td>Points 1 and 5 now have enough neighbours to be core too. Same two clusters; there are no border points any more.</td></tr>
+</table></div>
+<p>Step through this exact example yourself. The dashed circle is the eps-neighbourhood under examination. Change eps and min_samples and press Reset to reproduce the table.</p>
+<div class="demo" data-title="DBSCAN, one point at a time" id="demo-steps">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>A subtle detail.</strong> A border point that lies within reach of core points from <em>two</em> different clusters is given to whichever cluster reaches it first, so it depends on the order of the data. Core points and noise points are never order-dependent. This is a minor effect in practice, but it explains why shuffling the rows can move a few edge points.</p></div>
+
+<h2>3. Choosing eps and min_samples</h2>
+<h3>min_samples</h3>
+<ul>
+<li>Rule of thumb: at least <b>number of features + 1</b>; many people use <b>2 × the number of features</b>. For 2-D data the usual starting point is 4 or 5 (scikit-learn's default is 5).</li>
+<li>Larger values make the algorithm stricter: fewer, bigger, cleaner clusters and more noise. Use larger values for large or noisy datasets.</li>
+</ul>
+<h3>eps: the k-distance plot</h3>
+<p>For each point compute the distance to its (<code>min_samples</code> − 1)-th nearest neighbour (the point itself excluded), and sort those distances. <strong>A point is a core point exactly when this distance is at most eps.</strong> In the plot of the sorted values, points inside crowds are on the flat left part, and lonely points are on the steep right part; the <b>knee</b> between them is a natural choice for eps. Your data must be <strong>scaled</strong> first, because eps is a distance, and one eps has to make sense for every feature (see the overview lesson).</p>
+<p>Try it on the shapes from earlier lessons, now with 18 random noise points scattered on top. The dashed eps line on the right shows where you cut the curve: points below it are core points.</p>
+<div class="demo" data-title="Explore eps and min_samples" id="demo-explore">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Moons:</strong> around eps 0.25 to 0.3 you get two clean moons, with about half of the noise points caught. Slide eps down to 0.1: the moons shatter into a dozen pieces and a third of their points become noise. Slide up to 0.35: everything merges into one cluster.</li>
+<li><strong>Click any point</strong> to see its neighbourhood circle and whether it is core, border or noise.</li>
+<li><strong>"Varied density":</strong> a tight cluster next to a loose one. With a small eps the loose cluster falls apart or is thrown away as noise; with an eps big enough to hold it (about 0.4 to 0.5) the scattered noise points near the clusters get swallowed too (only a handful of the 18 are still caught). One eps has to compromise between the two clusters: DBSCAN's main weakness.</li>
+<li><strong>Rings:</strong> the outer ring is sparser than the inner one; a larger <code>min_samples</code> (8) helps ignore the random noise points that would otherwise form tiny spurious clusters.</li>
+</ul>
+
+<h3>A map of the settings</h3>
+<p>To see how sensitive DBSCAN is, this map runs it for every combination of eps and min_samples. The colour is the quality of the clustering (darker = better) and the number is how many clusters were found.</p>
+<div class="demo" data-title="Where do the good settings live?" id="demo-grid">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout warn"><p><strong>A scoring trap with noise.</strong> If you compare DBSCAN's labels with true labels using the adjusted Rand index (ARI) and treat "noise" as just another group, a sparse cluster that DBSCAN wrongly labels <em>entirely as noise</em> can still look excellent. I checked this with scikit-learn: two tight blobs plus one sparse blob of 100 points; at <code>eps=0.25</code> all 100 sparse points became noise, and the naïve ARI was still <b>0.99</b>. Giving each noise point its own label (so a lost real point counts as a miss) gives <b>0.72</b>, a much more honest number. The demos on this page use that stricter version, "ARI on the real clusters".</p></div>
+<div class="callout tip"><p><strong>When one eps is not enough.</strong> For clusters of very different densities, look at <b>OPTICS</b> and <b>HDBSCAN</b> (both in <code>sklearn.cluster</code>), which are DBSCAN's descendants: they consider many eps values at once. They have their own settings to choose (for HDBSCAN mainly <code>min_cluster_size</code>) and I have not tested them enough here to claim they always win.</p></div>
+
+<h2>4. DBSCAN in scikit-learn</h2>
+<p>Our twelve points:</p>
+<pre class="code">
+import numpy as np
+from sklearn.cluster import DBSCAN
+
+P = np.array([[1.0, 1.0], [1.6, 1.4], [2.2, 1.1], [2.9, 1.6], [3.6, 2.1], [6.0, 5.0],
+              [6.5, 5.6], [7.1, 5.2], [6.6, 4.5], [4.5, 5.0], [9.0, 1.5], [3.6, 3.6]])
+
+db = DBSCAN(eps=1.0, min_samples=3).fit(P)
+print(db.labels_)                    # [ 0  0  0  0  0  1  1  1  1 -1 -1 -1]    -1 means noise
+print(db.core_sample_indices_ + 1)   # [2 3 4 6 7 8 9]      -> exactly our core points
+
+for eps in (0.5, 1.6, 2.0):
+    print(eps, DBSCAN(eps=eps, min_samples=3).fit_predict(P))
+# 0.5 [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]         all noise
+# 1.6 [ 0  0  0  0  0  1  1  1  1  1 -1  0]         points 10 and 12 have joined clusters
+# 2.0 [ 0  0  0  0  0  0  0  0  0  0 -1  0]         everything merged
+</pre>
+<p>A realistic use: pick eps from the k-distance values, then check how eps changes the result. (Output from an actual run with scikit-learn 1.9.0; other versions may differ slightly.)</p>
+<pre class="code">
+from sklearn.datasets import make_moons
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import adjusted_rand_score
+
+X, y = make_moons(n_samples=300, noise=0.07, random_state=0)
+
+# k-distance for min_samples=5: distance to the 4th nearest OTHER point
+nn = NearestNeighbors(n_neighbors=5).fit(X)          # (the point itself counts as the first neighbour)
+kdist = np.sort(nn.kneighbors(X)[0][:, -1])
+print(np.percentile(kdist, [50, 90, 95, 99, 100]).round(3))   # [0.083 0.123 0.14 0.181 0.257]
+
+for eps in (0.05, 0.1, 0.2, 0.3):
+    labels = DBSCAN(eps=eps, min_samples=5).fit_predict(X)
+    print(eps, len(set(labels)) - (1 if -1 in labels else 0), (labels == -1).sum(), adjusted_rand_score(y, labels).round(3))
+# eps   clusters  noise  ARI
+# 0.05     5       269   0.011    <- too small: almost everything is noise
+# 0.1     13        30   0.237    <- the moons are shattered
+# 0.2      2         0   1.0      <- perfect (just above the 99th percentile of the k-distance values)
+# 0.3      1         0   0.0      <- the moons have merged
+</pre>
+<p>Notice how narrow the good range is: 0.2 is perfect but 0.3 already fails. Now noise detection: I added 30 random points to those 300 (<code>eps=0.15, min_samples=5</code>). DBSCAN found the 2 moons and flagged <b>22</b> points as noise: <b>20 of the 30</b> injected points, plus 2 real moon points on the edge. The other 10 random points happened to fall inside the crowded moons and were absorbed. Noise detection is good but not perfect.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>eps</code></td><td>Neighbourhood radius (default 0.5, which is rarely right: always set it, and scale your data first).</td></tr>
+<tr><td><code>min_samples</code></td><td>Points needed to be a core point, the point itself included (default 5).</td></tr>
+<tr><td><code>metric</code></td><td>Distance measure: <code>"euclidean"</code> (default), <code>"manhattan"</code>, <code>"cosine"</code>, or <code>"precomputed"</code> for your own distance matrix (for example geographic distances).</td></tr>
+<tr><td><code>algorithm</code></td><td>How neighbours are found: <code>"auto"</code> chooses a tree structure (kd-tree or ball tree) or brute force. Trees make DBSCAN fast on moderately large data.</td></tr>
+<tr><td><code>labels_</code></td><td>The cluster number of each point; <code>-1</code> = noise.</td></tr>
+<tr><td><code>core_sample_indices_</code>, <code>components_</code></td><td>Which points are core points, and their coordinates.</td></tr>
+<tr><td><code>fit_predict</code></td><td>Note: there is <b>no</b> <code>predict</code> for new points, because DBSCAN has no centres. To label new data, find the nearest core point (or refit).</td></tr>
+</table></div>
+
+<h2>5. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>No need to choose the number of clusters</td><td>Sensitive to eps: the sweet spot can be narrow</td></tr>
+<tr><td>Finds clusters of any shape (moons, rings, snakes)</td><td>One eps for all clusters: struggles when densities differ a lot</td></tr>
+<tr><td>Labels outliers as noise instead of distorting the clusters</td><td>Distances lose meaning in many dimensions; reduce dimensions first</td></tr>
+<tr><td>Only two settings, and the k-distance plot helps with eps</td><td>Needs scaled features; no <code>predict</code> for new points; memory/time grow quickly for very large datasets</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>📍 GPS and geography</h4><p>Cluster location pings into places (home, work, hotspots), with a haversine distance and eps in kilometres. Isolated pings are noise.</p></div>
+<div class="card"><h4>💳 Fraud and anomaly detection</h4><p>Normal behaviour forms dense regions; transactions that belong to no crowd are flagged for review.</p></div>
+<div class="card"><h4>🛰️ Astronomy and remote sensing</h4><p>Finding star clusters or objects in images, where shapes are irregular and there is background noise.</p></div>
+<div class="card"><h4>🏭 Sensor and defect data</h4><p>Groups of similar readings show up as dense regions; stray readings show up as noise.</p></div>
+<div class="card"><h4>🧬 Cell populations</h4><p>Flow-cytometry and single-cell data: irregular populations of different sizes, plus debris to discard.</p></div>
+<div class="card"><h4>🧹 Cleaning data</h4><p>Even if you then use another algorithm, DBSCAN's noise points are candidate outliers to remove before K-Means.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>DBSCAN finds <strong>dense regions separated by sparse space</strong>. You set a radius <code>eps</code> and a crowd size <code>min_samples</code>; it finds the number of clusters itself.</li>
+<li>A <strong>core point</strong> has ≥ min_samples points within eps (itself included); a <strong>border point</strong> is within eps of a core point; everything else is <strong>noise</strong> (label −1). Clusters grow by chains of overlapping core neighbourhoods.</li>
+<li>Our 12-point example: 7 core points, 2 border points and 3 noise points give 2 clusters at eps 1.0; eps 0.5 gives all noise, and eps 2.0 merges everything.</li>
+<li>Choose <code>eps</code> from the <strong>knee of the k-distance plot</strong> and <code>min_samples</code> from the number of features (at least features + 1); <strong>scale first</strong>.</li>
+<li>It follows curved shapes and rejects outliers, but one eps cannot serve clusters of very different density, and the good range of eps can be narrow. Score it carefully: noise-as-a-group can hide lost clusters.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>With <code>eps = 2</code> and <code>min_samples = 4</code>, a point has 3 <em>other</em> points within distance 2. Is it a core point? What if it has only 2 others?</li>
+<li>In the second case (2 others), what could the point still be, and what decides it?</li>
+<li>The sorted k-distance values of nine points are 0.10, 0.10, 0.11, 0.12, 0.12, 0.13, 0.50, 0.90, 1.40. Where is the knee, and what eps would you try? Which points are probably noise?</li>
+<li>Your data has 10 features. What is a sensible minimum for <code>min_samples</code>? Why must the features be scaled before choosing eps?</li>
+<li>Bonus: run the moons code above and try <code>eps=0.25</code> and <code>eps=0.35</code>. Where does the single-cluster failure begin?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Counting itself, the point has 3 + 1 = 4 points within reach: 4 ≥ 4, so it <b>is a core point</b>. With only 2 others it has 3 points including itself: 3 &lt; 4, so it is <b>not</b> a core point.</p>
+<p><b>2.</b> It could be a <b>border point</b> (if at least one of its neighbours is a core point) or <b>noise</b> (if none of them is).</p>
+<p><b>3.</b> The curve is flat around 0.10 to 0.13 and then jumps to 0.50, 0.90 and 1.40: the knee is at about 0.13. Try <b>eps ≈ 0.15</b>. The last three points (0.50, 0.90, 1.40) are far from their neighbours and are probably noise.</p>
+<p><b>4.</b> At least 10 + 1 = <b>11</b> (or about 2 × 10 = 20). Eps is a single distance used for every feature; if one feature has a much larger scale it dominates the distance, so a single eps would be meaningless for the others.</p>
+<p><b>5.</b> I ran these: eps 0.2 gives 2 clusters (ARI 1.0), <b>0.25</b> still gives 2 clusters (ARI 0.987), <b>0.3</b> and <b>0.35</b> both give a single merged cluster (ARI 0). So the failure begins between 0.25 and 0.3: a narrow safe window.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/dbscan.js"></script>
+</body>
+</html>

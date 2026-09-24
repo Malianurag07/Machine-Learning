@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types of Machine Learning · ML, Visually</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-topic="types">
+<article id="lesson">
+
+<h1>Types of Machine Learning</h1>
+<p class="lede">Machine learning problems come in four families, and the family is decided by one question: <em>what kind of feedback does the learner get?</em></p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 45 min</span><span class="chip plain">6 interactive demos</span></div>
+
+<h2>1. The four families at a glance</h2>
+<div class="callout analogy"><p><strong>Four ways to learn.</strong></p>
+<ul>
+<li><strong>Supervised</strong>: a student with a teacher and an answer key. Every practice question has a marked answer.</li>
+<li><strong>Unsupervised</strong>: an explorer with no map or teacher, sorting shells on a beach into piles that look alike.</li>
+<li><strong>Semi-supervised</strong>: a student given just a few solved examples and a huge pile of unsolved ones to figure out.</li>
+<li><strong>Reinforcement</strong>: training a puppy. Nobody shows the right move; you give a treat (reward) or a "no" (penalty) and it works out what to do.</li>
+</ul></div>
+<div class="tw"><table>
+<tr><th>Type</th><th>Training data</th><th>Goal</th><th>Feedback</th><th>Typical output</th></tr>
+<tr><td><strong>Supervised</strong></td><td>Inputs <em>with</em> correct labels</td><td>Predict the label for new inputs</td><td>Direct: the right answer</td><td>A number or a category</td></tr>
+<tr><td><strong>Unsupervised</strong></td><td>Inputs only, <em>no</em> labels</td><td>Discover hidden structure</td><td>None</td><td>Groups, simpler features, rules</td></tr>
+<tr><td><strong>Semi-supervised</strong></td><td>A few labels + lots of unlabelled</td><td>Predict labels using both</td><td>Partial</td><td>Labels for the unlabelled data</td></tr>
+<tr><td><strong>Reinforcement</strong></td><td>No dataset: an agent interacting with an environment</td><td>Maximise total reward</td><td>Delayed rewards / penalties</td><td>A policy (what to do in each situation)</td></tr>
+</table></div>
+
+<h3>Which type is my problem?</h3>
+<p>Answer the questions below and see where you land. The same flow is the mental checklist you will use on real projects.</p>
+<div class="demo" data-title="Problem-type finder" id="demo-finder">
+  <div class="db"><div id="finderBody" style="min-height:150px"></div></div>
+  <div class="controls"><button class="btn" id="finderReset">↺ Start over</button></div>
+</div>
+
+<h2>2. Supervised learning</h2>
+<p>In <strong>supervised learning</strong> the model is trained on <strong>labelled data</strong>: every example comes with the correct answer. The model learns the mapping from inputs to outputs, then predicts the answer for new inputs it has never seen. "Supervised" means the answers act as a supervisor that says how wrong each guess was.</p>
+<div class="flow"><div class="box a">Labelled data<br><small>(features X + answers y)</small></div><span class="arr">→</span><div class="box b">Learning algorithm</div><span class="arr">→</span><div class="box c">Model</div><span class="arr">→</span><div class="box d">Prediction on new X</div></div>
+<div class="flow" style="margin-top:-4px"><small style="color:var(--muted)">During training: compare prediction with the true answer → compute the error → adjust the model → repeat.</small></div>
+<p>Supervised learning is split into two sub-types, depending on what the label looks like.</p>
+
+<h3>2a. Regression: predict a number</h3>
+<p><strong>Regression</strong> predicts a <em>continuous numeric value</em>: something that can be any number in a range, with meaningful distances between values.</p>
+<ul>
+<li>House price (rent) → ₹5,000, ₹7,500, ₹12,000</li>
+<li>Temperature tomorrow → 25 °C, 30 °C, 18 °C</li>
+<li>Salary of an employee → 30,000, 50,000, 80,000</li>
+</ul>
+<p><strong>Real-world uses:</strong> pricing houses from area, rooms and location; forecasting stock or commodity prices; weather forecasting; forecasting product sales for retail or e-commerce; estimating delivery time; predicting energy demand for a power grid.</p>
+<p><strong>Algorithms you will learn:</strong> Linear, Ridge and LASSO Regression; KNN, Decision Tree, SVM (SVR), Random Forest and Gradient Boosting also have regression versions.</p>
+
+<h3>2b. Classification: predict a category</h3>
+<p><strong>Classification</strong> predicts a <em>discrete class</em> from a fixed list of options.</p>
+<ul>
+<li><strong>Binary</strong>: two classes: spam / not spam, fraud / genuine, disease / healthy.</li>
+<li><strong>Multi-class</strong>: many classes but exactly one is right: digit 0–9, flower species, type of loan.</li>
+<li><strong>Multi-label</strong>: several can be true at once: a movie tagged "action" <em>and</em> "comedy".</li>
+</ul>
+<p><strong>Real-world uses:</strong> spam filters, fraud detection, medical diagnosis, loan approval, sentiment analysis of reviews, face recognition, predicting customer churn.</p>
+<p><strong>Algorithms you will learn:</strong> Logistic Regression, Naïve Bayes, KNN, Decision Tree, SVM, Random Forest, AdaBoost, Gradient Boosting, XGBoost.</p>
+<div class="callout warn"><p><strong>A common confusion:</strong> "Logistic <em>Regression</em>" is a <em>classification</em> algorithm. The name is historical. It outputs a probability, which is then cut into classes. Always decide regression vs. classification by the <em>type of the label</em>, not by the algorithm's name.</p></div>
+
+<div class="demo" data-title="Regression vs. classification, side by side" id="demo-sup">
+  <div class="db"><div class="two-col" id="supCols"></div></div>
+  <div class="readout" id="supOut">Click inside either plot to make a prediction for a new sample.</div>
+</div>
+
+<h3>Supervised learning: end-to-end example</h3>
+<p>Predict whether a customer will cancel a subscription (<em>churn</em>). The data is a table where each row is a customer and the last column is the answer we already know from history:</p>
+<div class="tw"><table>
+<tr><th>Months as customer</th><th>Support tickets</th><th>Monthly bill (₹)</th><th>Churned? (label)</th></tr>
+<tr><td class="num">2</td><td class="num">5</td><td class="num">999</td><td>Yes</td></tr>
+<tr><td class="num">36</td><td class="num">0</td><td class="num">499</td><td>No</td></tr>
+<tr><td class="num">5</td><td class="num">3</td><td class="num">799</td><td>Yes</td></tr>
+<tr><td class="num">24</td><td class="num">1</td><td class="num">599</td><td>No</td></tr>
+</table></div>
+<pre class="code">
+from sklearn.linear_model import LogisticRegression   # a classifier
+from sklearn.linear_model import LinearRegression     # a regressor
+
+# Classification: y is a category (0 = stayed, 1 = churned)
+clf = LogisticRegression().fit(X_train, y_class)
+print(clf.predict([[3, 4, 899]]))          # -> [1]  "will churn"
+
+# Regression: y is a number (how many rupees the customer will spend next year)
+reg = LinearRegression().fit(X_train, y_amount)
+print(reg.predict([[3, 4, 899]]))          # -> [7315.4]
+</pre>
+<p>Same features, two different questions. Only the type of <code>y</code> changes, and that chooses the family of algorithm.</p>
+
+<h2>3. Unsupervised learning</h2>
+<p><strong>Unsupervised learning</strong> works on <strong>unlabelled data</strong>: there is no "right answer" column. The model must find hidden patterns, structure or relationships on its own, without prior guidance.</p>
+<div class="flow"><div class="box a">Input<br><small>(unlabelled data)</small></div><span class="arr">→</span><div class="box b">Model</div><span class="arr">→</span><div class="box c">Discovers hidden patterns,<br>structure &amp; relationships</div></div>
+<p>The two big problem types are <strong>clustering</strong> and <strong>dimensionality reduction</strong>; a third, <strong>association rule learning</strong>, finds "things that go together".</p>
+
+<h3>3a. Clustering: group similar things</h3>
+<p><strong>Clustering</strong> groups data points that look alike, using only their features. Data flows: input features → model (a scientific algorithm) → find similar patterns → interpret → Cluster 1, Cluster 2, Cluster 3….</p>
+<ul>
+<li><strong>Customers</strong> → Group 1, Group 2, Group 3 (customer segmentation for targeted marketing).</li>
+<li><strong>Animals</strong> → Cluster 1: cats &amp; dogs · Cluster 2: lions &amp; tigers.</li>
+<li><strong>Movies</strong> → Action · Romance · Comedy (recommendation).</li>
+<li><strong>News articles</strong> → Entertainment · Business · Sports · Politics.</li>
+</ul>
+<div class="demo" data-title="Find the hidden groups (k-means preview)" id="demo-cluster">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Notice that <em>you</em> had to pick how many groups (K) and that the algorithm gave the groups only numbers (0, 1, 2), not names. Interpreting what a cluster means ("budget shoppers") is the human's job. The K-Means, DBSCAN and Hierarchical lessons cover this in depth.</p>
+
+<h3>3b. Dimensionality reduction: keep the information, drop the extra columns</h3>
+<p>The number of input features is the dataset's <em>dimension</em>. <strong>Dimensionality reduction</strong> reduces the number of features (variables) while keeping the important information. This simplifies the model, cuts computation and often improves performance.</p>
+<p>Example: a house table has "number of bedrooms" and "total area of bedrooms", which carry nearly the same information. Combine them into a single feature.</p>
+<div class="tw"><table>
+<tr><th>Bedrooms</th><th>Area per bedroom (sq ft)</th><th>Price</th><th></th><th>Total area of bedrooms</th><th>Price</th></tr>
+<tr><td class="num">4</td><td class="num">150</td><td class="num">6,000,000</td><td rowspan="3" style="text-align:center;vertical-align:middle">→</td><td class="num">600</td><td class="num">6,000,000</td></tr>
+<tr><td class="num">3</td><td class="num">200</td><td class="num">5,000,000</td><td class="num">600</td><td class="num">5,000,000</td></tr>
+<tr><td class="num">5</td><td class="num">300</td><td class="num">8,000,000</td><td class="num">1,500</td><td class="num">8,000,000</td></tr>
+</table></div>
+<p>Bedrooms × area-per-bedroom gives the total bedroom area, so three columns became two (dimension 3 → 2) without losing what matters. Another example: a student's scores in 10 subjects can be reduced to a single <em>total marks</em> feature.</p>
+<p><strong>Why bother?</strong> Fewer columns mean faster training, less complexity and less over-fitting, and you can visualise data by squashing it down to 2D. In short: <em>keep the important information, remove unnecessary features, lose almost no data.</em></p>
+<div class="demo" data-title="Squash 2D data onto 1 line: which direction keeps the most information?" id="demo-dim">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p>"Information" here means <strong>spread</strong> (statisticians call it variance): how far apart the points are. Squash the points onto a line, then measure how spread out the shadows are:
+<br><strong>share kept = spread of the shadows ÷ total spread of the original points</strong>.
+<br>The direction that keeps the biggest share is the <strong>first principal component</strong>. Finding it is called <strong>PCA</strong> (Principal Component Analysis), which gets a full lesson later. LDA is a supervised cousin that keeps the directions that <em>separate classes</em> best.</p></div>
+
+<h3>3c. Association rule learning: things that go together</h3>
+<p>Finds rules such as <em>"customers who buy bread and butter often also buy jam"</em> by counting how often items appear together in transactions (market-basket analysis). It powers "frequently bought together" boxes, store shelf layout and cross-selling.</p>
+
+<div class="callout real"><p><strong>Real-world unsupervised learning:</strong> banks group customers by behaviour to design products; Spotify clusters listeners with similar taste; retailers analyse baskets; security teams flag unusual network traffic (<em>anomaly detection</em>); data teams use PCA to compress hundreds of sensor readings before modelling; biologists cluster genes with similar activity.</p></div>
+
+<h2>4. Semi-supervised learning</h2>
+<p>Labels are expensive: a doctor must annotate each scan, a linguist each sentence. Yet raw, unlabelled data is cheap and plentiful. <strong>Semi-supervised learning</strong> trains on a <strong>small labelled set plus a large unlabelled set</strong>. The labelled examples say <em>what the classes are</em>; the unlabelled examples reveal <em>the shape of the data</em> (which points cluster together), which pins down where the boundaries should go.</p>
+<div class="callout analogy"><p>A teacher solves just two problems on the board (one of each kind) and hands you 100 unsolved ones. You notice the unsolved problems fall into two visibly similar batches, so you copy the solution style to each batch. Two labels plus lots of structure are enough.</p></div>
+<div class="demo" data-title="Two labels, 148 unlabelled points: spread the labels along the data" id="demo-semi">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p><strong>The key assumption:</strong> points that are close to each other, or connected through chains of neighbours, probably share a label. Semi-supervised methods (Label Propagation, Label Spreading, self-training) use exactly this. They get their own lessons later.</p>
+<div class="callout real"><p><strong>Real-world uses:</strong> medical imaging (few expert-annotated scans, thousands of unlabelled ones); speech recognition; web-page classification; labelling text or images at scale; fraud detection where only a few cases are confirmed.</p></div>
+
+<h2>5. Reinforcement learning (RL)</h2>
+<p>In <strong>reinforcement learning</strong> there is no dataset. An <strong>agent</strong> learns by <em>interacting</em> with an <strong>environment</strong>: it takes an action, sees what happens, and receives feedback as a <strong>reward</strong> or <strong>penalty</strong>. Its goal is to learn a strategy that maximises the total reward over time.</p>
+<ul>
+<li>A <strong>reward</strong> is given when the action is good or desired: it moves the agent closer to the goal, follows the correct rule or behaviour, or produces a positive outcome.</li>
+<li>A <strong>penalty</strong> is given when the action is bad or undesired: it moves the agent away from the goal, breaks a rule or causes failure, or produces a negative outcome.</li>
+</ul>
+<h3>How it works: the loop</h3>
+<div class="flow"><div class="box a">Agent takes an <b>action</b></div><span class="arr">→</span><div class="box b">Environment changes</div><span class="arr">→</span><div class="box c">Agent gets <b>reward / penalty</b> + new state</div><span class="arr">→</span><div class="box d">Updates its <b>strategy</b></div><span class="arr">↻</span></div>
+<div class="tw"><table>
+<tr><th>Term</th><th>Meaning</th><th>Robot-in-a-maze example</th></tr>
+<tr><td><strong>Agent</strong></td><td>The learner / decision maker</td><td>The robot</td></tr>
+<tr><td><strong>Environment</strong></td><td>The world the agent acts in</td><td>The maze</td></tr>
+<tr><td><strong>State (s)</strong></td><td>The current situation</td><td>Which cell the robot is in</td></tr>
+<tr><td><strong>Action (a)</strong></td><td>A choice the agent can make</td><td>Up, down, left, right</td></tr>
+<tr><td><strong>Reward (r)</strong></td><td>Numeric feedback after an action</td><td>+10 at the exit, −10 in a pit, −0.2 per step (to encourage speed)</td></tr>
+<tr><td><strong>Policy (π)</strong></td><td>The strategy: which action to take in each state</td><td>The arrows drawn in the demo below</td></tr>
+<tr><td><strong>Discount factor (γ)</strong></td><td>How much future rewards matter compared to immediate ones</td><td>γ near 1 → patient; near 0 → short-sighted</td></tr>
+</table></div>
+<p>The trick that makes RL work is <strong>Q-learning</strong>: keep a table Q(state, action) = "how good is this action here in the long run", and update it after every step.</p>
+<div class="callout math">
+<p><strong>In words:</strong> new score = old score + α × ( what I just learned − what I believed ), where <em>what I just learned</em> = reward + γ × (the best score available from the next spot).</p>
+<p><em>Worked example.</em> α = 0.5, γ = 0.9. The robot in state <em>s</em> moves right, gets reward r = −0.2 and lands in state <em>s′</em> whose best Q-value is 6. Old Q(s, right) = 2.
+<br>Target = r + γ·max Q(s′) = −0.2 + 0.9 × 6 = <strong>5.2</strong>.
+<br>Error = 5.2 − 2 = 3.2.
+<br>New Q = 2 + 0.5 × 3.2 = <strong>3.6</strong>. Repeat this thousands of times and good values ripple back from the goal to every cell.</p></div>
+<div class="demo" data-title="Train a robot with Q-learning" id="demo-rl">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p><strong>Explore vs. exploit.</strong> ε (epsilon) is the chance the agent tries a random action instead of the best-known one. With ε = 0 it never discovers better routes; with ε = 1 it never uses what it learned. Good RL balances both.</p>
+<div class="callout real"><p><strong>Real-world uses:</strong> game playing (chess, Go, video games; AlphaGo); robotics (path planning, grasping, movement control); self-driving cars (lane changes, braking); data-centre cooling and energy control; recommendation ordering and ad bidding; and fine-tuning large language models with human feedback (RLHF).</p></div>
+
+<h2>6. All four side by side, in one product</h2>
+<p>Real products mix the families. A music streaming app might use:</p>
+<div class="cards">
+<div class="card"><h4>Supervised</h4><p>Predict whether you will <b>skip</b> a song (label: skipped yes/no) or predict the <b>number of minutes</b> you will listen tomorrow.</p></div>
+<div class="card"><h4>Unsupervised</h4><p><b>Cluster</b> millions of listeners by taste to create "listeners like you"; use PCA to compress audio features.</p></div>
+<div class="card"><h4>Semi-supervised</h4><p>Only a few thousand songs have a human-assigned mood; <b>propagate</b> the mood tags to the millions of untagged ones.</p></div>
+<div class="card"><h4>Reinforcement</h4><p>Choose the <b>next song</b> in an auto-playlist; reward = you listened to the end, penalty = you skipped.</p></div>
+</div>
+<p><strong>A fifth term you will hear: self-supervised learning.</strong> The labels are generated from the data itself (hide a word in a sentence and predict it). Large language models are pre-trained this way. It sits between unsupervised and supervised and is beyond the scope of this classical-ML course, but now you know where it fits.</p>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Supervised</strong> = labelled data. Numeric label → <em>regression</em>; category label → <em>classification</em>.</li>
+<li><strong>Unsupervised</strong> = no labels. Find groups (<em>clustering</em>), fewer columns (<em>dimensionality reduction</em>), or co-occurring items (<em>association rules</em>).</li>
+<li><strong>Semi-supervised</strong> = few labels + many unlabelled points, and neighbours share labels.</li>
+<li><strong>Reinforcement</strong> = an agent learns by trial, reward and penalty, and the output is a policy.</li>
+<li>Pick the family by asking: <em>"What feedback do I have?"</em></li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (10 minutes, optional).</strong> For each scenario, decide the family and, if supervised, regression or classification. Then open the answers and compare.</p>
+<ol>
+<li>Predict the marks a student will score from hours studied.</li>
+<li>Split 50,000 shoppers into segments without any predefined categories.</li>
+<li>Decide whether a tumour in a scan is benign or malignant, using scans doctors labelled.</li>
+<li>Teach a drone to land on a moving platform.</li>
+<li>Shrink a 100-column sensor table to 10 columns for faster modelling.</li>
+<li>Only 200 of 20,000 product reviews are tagged positive/negative, and you want tags for all.</li>
+<li>Predict tomorrow's electricity demand in megawatts.</li>
+<li>Find which grocery items are commonly bought together.</li>
+</ol>
+<details><summary>Show answers</summary>
+<ol>
+<li>Supervised · <b>regression</b> (a number).</li>
+<li>Unsupervised · <b>clustering</b>.</li>
+<li>Supervised · <b>classification</b> (binary).</li>
+<li><b>Reinforcement</b> learning (reward for landing, penalty for crashing).</li>
+<li>Unsupervised · <b>dimensionality reduction</b> (PCA).</li>
+<li><b>Semi-supervised</b> learning (few labels, many unlabelled).</li>
+<li>Supervised · <b>regression</b>.</li>
+<li>Unsupervised · <b>association rule learning</b>.</li>
+</ol></details>
+</div>
+
+</article>
+<script src="../js/topics.js"></script>
+<script src="../js/lib/viz.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/pages/types.js"></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridge Regression · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="ridge">
+<article id="lesson">
+
+<h1>Ridge Regression</h1>
+<p class="lede">Ridge Regression is linear regression with a leash: it adds a penalty on the size of the coefficients so the model stays simple, stable and better at predicting data it has never seen.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 70 min</span><span class="chip plain">5 interactive demos</span></div>
+
+<h2>1. The problem Ridge solves</h2>
+<p>Ordinary linear regression (OLS, "ordinary least squares") only cares about one thing: make the training error as small as possible. That is fine when you have plenty of data and a few independent features. It goes wrong in three common situations:</p>
+<ul>
+<li><strong>Too many features, too little data.</strong> With enough knobs the line can bend around every training point, memorising noise (<em>overfitting</em>).</li>
+<li><strong>Correlated features (multicollinearity).</strong> If "area in sq ft" and "area in sq m" are both features, the model can't tell which one deserves the credit. It may give one a huge positive weight and the other a huge negative weight that nearly cancel. The predictions look fine on training data but the coefficients are wild and unstable.</li>
+<li><strong>Noisy data.</strong> Small changes in the data cause big swings in the coefficients (<em>high variance</em>).</li>
+</ul>
+<div class="callout analogy"><p><strong>A spending budget.</strong> Give someone unlimited money and they may buy one crazy, extravagant thing that "fits" a whim. Give them a limited budget and they must spread their money sensibly. Ridge gives the model a <em>budget for the size of its coefficients</em>: a big weight is expensive, so the model only uses one if it really pays off. Or think of a <strong>tax on large weights</strong>: everything still gets used, but nothing gets extreme.</p></div>
+<p>This idea of adding a penalty to keep a model simple is called <strong>regularisation</strong>. Ridge uses the <strong>L2 penalty</strong> (the sum of squared coefficients).</p>
+
+<h2>2. The Ridge cost function</h2>
+<p>Recall the Linear Regression cost function, the average squared error. Ridge keeps it and <strong>adds a penalty term</strong>:</p>
+$$J(\theta)=\underbrace{\frac1{2n}\sum_{i=1}^{n}\big(h_\theta(x_i)-y_i\big)^2}_{\text{how wrong on the data}}\;+\;\underbrace{\lambda\sum_{j=1}^{k}\theta_j^{2}}_{\text{L2 penalty: how big the weights are}}$$
+<p><strong>In words:</strong> Ridge cost = (average squared mistake) + λ × (the sum of the squared weights).</p>
+<div class="tw"><table>
+<tr><th>Piece</th><th>Meaning</th></tr>
+<tr><td>First term</td><td>The usual data-fit error (exactly the cost function from the Linear Regression lesson).</td></tr>
+<tr><td>\(\theta_j^2\)</td><td>The square of each coefficient: large weights are penalised much more than small ones, and the sign doesn't matter.</td></tr>
+<tr><td>\(\lambda\ge 0\)</td><td>The <strong>regularisation strength</strong>, a hyperparameter <em>you</em> choose. λ = 0 → ordinary linear regression. λ very large → all weights squeezed towards 0 (the model becomes a flat line at the mean). In scikit-learn it is called <code>alpha</code>.</td></tr>
+<tr><td>Sum from j = 1</td><td>The intercept θ₀ is <strong>not</strong> penalised. It only shifts the line up or down and doesn't make the model more complex.</td></tr>
+</table></div>
+<p>Now the model must balance two goals: <em>fit the data</em> and <em>keep the weights small</em>. λ decides how much the second goal matters.</p>
+<div class="callout tip"><p><strong>A note on scaling of λ.</strong> The formula above uses the 1/(2n) convention of the previous lesson. scikit-learn uses the equivalent form "minimise Σ(y − ŷ)² + α·Σθ²" (no 1/n). The two differ only by a constant, α = 2n·λ. In the worked numbers below we use scikit-learn's form so you can reproduce them with code.</p></div>
+
+<h2>3. Ridge by hand: one feature</h2>
+<p>For a single feature, after centering the data (subtracting the means \(\bar x\) and \(\bar y\)), Ridge has a beautifully simple answer:</p>
+$$\theta_1=\frac{S_{xy}}{S_{xx}+\lambda},\qquad \theta_0=\bar y-\theta_1\bar x,\qquad S_{xy}=\sum(x_i-\bar x)(y_i-\bar y),\; S_{xx}=\sum(x_i-\bar x)^2$$
+<p><strong>In words:</strong> S<sub>xy</sub> measures how x and y move together, S<sub>xx</sub> measures how spread out x is. Plain regression divides the first by the second; Ridge adds λ to the bottom.</p>
+<p>Compare with plain linear regression, \(\theta_1=S_{xy}/S_{xx}\): the only change is that λ is <em>added to the denominator</em>, which can only make the slope smaller.</p>
+<div class="callout math">
+<p>Use the data from the last lesson: (1, 2), (2, 4), (3, 5), (4, 8). We already found \(\bar x=2.5\), \(\bar y=4.75\), \(S_{xy}=9.5\), \(S_{xx}=5\).</p>
+<div class="tw"><table>
+<tr><th>λ</th><th>θ₁ = 9.5 / (5 + λ)</th><th>θ₀ = 4.75 − θ₁·2.5</th><th>Prediction at x = 5</th></tr>
+<tr><td class="num">0 (OLS)</td><td class="num">9.5 / 5 = <b>1.900</b></td><td class="num">0.000</td><td class="num">9.500</td></tr>
+<tr><td class="num">1</td><td class="num">9.5 / 6 = <b>1.583</b></td><td class="num">0.792</td><td class="num">8.708</td></tr>
+<tr><td class="num">5</td><td class="num">9.5 / 10 = <b>0.950</b></td><td class="num">2.375</td><td class="num">7.125</td></tr>
+<tr><td class="num">20</td><td class="num">9.5 / 25 = <b>0.380</b></td><td class="num">3.800</td><td class="num">5.700</td></tr>
+<tr><td class="num">→ ∞</td><td class="num"><b>→ 0</b></td><td class="num">→ 4.75 (the mean of y)</td><td class="num">→ 4.75</td></tr>
+</table></div>
+<p>As λ grows, the slope shrinks smoothly from 1.9 towards 0, and the line pivots (always passing through the centre of the data \((\bar x,\bar y)\)) until it becomes flat at the average. Drag λ below and watch it happen.</p></div>
+<div class="demo" data-title="Shrink the slope: λ pivots the line around the data's centre" id="demo-r1">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Try <strong>Add an outlier</strong>: the plain OLS line (green dashes) chases it, while a moderately regularised line (coral) reacts less. That is Ridge's stability at work.</p>
+
+<h2>4. Many features, and the "weight decay" view</h2>
+<p>Everything above still works with many features: Ridge finds the weights the same way ordinary regression does, except that λ is quietly added to the "how spread out is each feature" numbers before solving. (For the curious, the matrix form is \(\theta=(X^TX+\lambda I)^{-1}X^Ty\). You never write it yourself; <code>Ridge</code> does it.)</p>
+<p>A very useful side effect: even if two features are exact copies, which breaks ordinary regression, Ridge still returns one clean answer. So Ridge <strong>cures multicollinearity</strong>. (The name "ridge" comes from λ being added along the diagonal of that matrix, like a ridge.)</p>
+<p>If you train with gradient descent instead, the penalty adds one simple step to every update: <strong>shrink every weight a tiny bit, then apply the usual correction.</strong></p>
+<div class="callout math"><p>each step: <code>new weight = old weight × (1 − tiny shrink) − α × usual correction</code>. Because the weights "decay" a little every step, this is also called <strong>weight decay</strong> in neural networks.</p></div>
+
+<h2>5. Ridge tames correlated features</h2>
+<p>Here is a dataset of 5 features. Features x₁, x₂, x₃ are three almost-identical copies of the same signal; x₄ and x₅ are independent (x₅ is pure noise with no true effect). The plot shows each coefficient as λ increases (the <strong>coefficient path</strong>). Move the slider to read off the values.</p>
+<div class="demo" data-title="Coefficient paths: OLS is wild, Ridge is calm" id="demo-r2">
+  <div class="db" data-canvas></div>
+  <div class="db"><div class="tw"><table id="r2Tbl"></table></div></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>At λ ≈ 0 (OLS), the three twin coefficients are erratic: one might be large and another near zero, or even negative. As λ rises they <strong>converge to similar, sensible values</strong> that share the credit, while every coefficient shrinks towards (but never exactly to) zero. Notice x₅, the noise feature, is <em>not</em> removed. Ridge shrinks everything but keeps all features. (LASSO, the next lesson, can drive coefficients exactly to zero.)</p>
+
+<h2>6. Bias, variance and the sweet spot for λ</h2>
+<p>Regularisation trades a little <strong>bias</strong> (the model is deliberately a bit "too simple", so it can't perfectly fit the training data) for a large drop in <strong>variance</strong> (the model no longer jumps around with every noise wiggle). Test error is what we care about, and it is usually lowest at a moderate λ.</p>
+<p>In the demo below we fit a very flexible curve (a high-degree polynomial, the same overfitting situation as in the Introduction lesson) to 10 noisy points. With λ ≈ 0 it goes wild; with a suitable λ it turns into a smooth curve that follows the true pattern; with λ too large it flattens out (underfitting).</p>
+<div class="demo" data-title="Tame an overfitting polynomial with λ" id="demo-r3">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>training points</span><span><i style="background:transparent;border:2px solid var(--c2)"></i>test points</span><span>dashed = true pattern</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>How to choose λ in practice.</strong> Never by guessing or by looking at training error (training error always prefers λ = 0). Try a grid of values (e.g. 0.001, 0.01, 0.1, 1, 10, 100) and pick the one with the best <strong>cross-validated</strong> score. scikit-learn has <code>RidgeCV</code> for exactly this, and <code>GridSearchCV</code> (a later lesson) works with any model.</p></div>
+
+<h2>7. The geometry: why Ridge shrinks but never zeroes</h2>
+<p>Another way to see Ridge: minimise the data error <em>subject to a budget</em> \(\theta_1^2+\theta_2^2\le t\). With two weights, that budget is a <strong>circle</strong> around the origin. The error has elliptical contours around the unconstrained best answer (the OLS solution ★). The Ridge answer is where the smallest error ellipse that reaches the circle just touches it.</p>
+<div class="demo" data-title="Error contours vs. the L2 circle" id="demo-r4">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Because a circle has no corners, the touching point almost never lies exactly on an axis, so no coefficient is forced to exactly zero. Each is pulled part of the way towards zero. (A diamond-shaped budget, as in LASSO, has corners on the axes, and that is how LASSO produces exact zeros. You will see it in the next lesson.)</p>
+
+<h2>8. Ridge in scikit-learn</h2>
+<pre class="code">
+from sklearn.linear_model import Ridge
+
+X = [[1], [2], [3], [4]]
+y = [2, 4, 5, 8]
+
+model = Ridge(alpha=1.0)       # alpha is lambda: the regularisation strength
+model.fit(X, y)
+
+print(model.coef_)             # [1.5833]   shrunk from 1.9 (plain LinearRegression)
+print(model.intercept_)        # 0.7917
+print(model.predict([[5]]))    # [8.7083]
+</pre>
+<p>These match the λ = 1 row of our hand calculation. A realistic workflow: <strong>scale first</strong> (the penalty treats all coefficients equally, so a feature measured in large units would otherwise be punished less than one in small units), then pick α by cross-validation:</p>
+<pre class="code">
+from sklearn.datasets import fetch_california_housing
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import RidgeCV
+from sklearn.metrics import mean_squared_error
+
+X, y = fetch_california_housing(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = make_pipeline(
+    StandardScaler(),
+    RidgeCV(alphas=[0.001, 0.01, 0.1, 1, 10, 100], cv=5),   # tries each alpha with 5-fold CV
+)
+model.fit(X_train, y_train)
+
+ridge = model.named_steps["ridgecv"]
+print("best alpha:", ridge.alpha_)
+print("coefficients:", ridge.coef_)
+print("test RMSE:", mean_squared_error(y_test, model.predict(X_test)) ** 0.5)
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter</th><th>What it does</th></tr>
+<tr><td><code>alpha</code></td><td>Regularisation strength λ. 0 = plain OLS; larger = more shrinkage. Default 1.0.</td></tr>
+<tr><td><code>fit_intercept</code></td><td>Whether to learn θ₀ (never penalised). Default True.</td></tr>
+<tr><td><code>solver</code></td><td>How it is computed: <code>"auto"</code> picks a suitable one (Cholesky/closed form for small data, <code>"sag"</code>/<code>"saga"</code> for huge data).</td></tr>
+<tr><td><code>RidgeCV(alphas=…, cv=…)</code></td><td>Built-in search for the best alpha using cross-validation.</td></tr>
+<tr><td><code>coef_</code>, <code>intercept_</code></td><td>The learned weights, as in <code>LinearRegression</code>.</td></tr>
+</table></div>
+<p>For classification the same idea appears as the <code>C</code> parameter of <code>LogisticRegression</code> (C is the <em>inverse</em> of the regularisation strength) and as <code>RidgeClassifier</code>.</p>
+
+<h2>9. Ridge in the real world</h2>
+<div class="cards">
+<div class="card"><h4>🧬 Genomics</h4><p>Thousands of gene-expression features but only hundreds of patients (more features than samples). OLS can't even be solved; Ridge can.</p></div>
+<div class="card"><h4>🏠 Property valuation</h4><p>Features like area, rooms, bathrooms and plot size are strongly correlated. Ridge keeps the weights sensible and the model stable across neighbourhoods.</p></div>
+<div class="card"><h4>📉 Finance</h4><p>Technical indicators overlap heavily. Ridge regression is a standard way to build return-prediction and risk models from correlated signals.</p></div>
+<div class="card"><h4>📣 Marketing-mix modelling</h4><p>TV, radio and online ad spend move together over time. Ridge separates their effects more reliably than plain regression.</p></div>
+<div class="card"><h4>🔊 Sensors & signals</h4><p>Hundreds of neighbouring sensor channels or spectral bands that are nearly identical; Ridge is a fast, robust baseline.</p></div>
+<div class="card"><h4>📝 Text & high-dimensional data</h4><p>Bag-of-words features with tens of thousands of columns are usually modelled with L2-regularised linear models.</p></div>
+</div>
+<div class="tw"><table>
+<tr><th></th><th>Linear (OLS)</th><th>Ridge (L2)</th><th>LASSO (L1, next lesson)</th></tr>
+<tr><td>Penalty</td><td>None</td><td>λ Σ θ²</td><td>λ Σ |θ|</td></tr>
+<tr><td>Coefficients</td><td>Can be huge/unstable</td><td>Shrunk, all kept</td><td>Shrunk, some exactly 0</td></tr>
+<tr><td>Correlated features</td><td>Unstable</td><td>Share the credit</td><td>Tends to pick one</td></tr>
+<tr><td>Feature selection</td><td>No</td><td>No</td><td>Yes</td></tr>
+<tr><td>Needs scaling</td><td>Only for gradient descent</td><td><b>Yes</b></td><td><b>Yes</b></td></tr>
+</table></div>
+<p><strong>When not to use it:</strong> if you want a <em>sparse</em> model with only a few features (use LASSO/Elastic Net), if the true relationship is strongly non-linear (use trees or add non-linear features), or if the model is already underfitting (regularisation makes the model simpler, which would hurt more).</p>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Ridge = linear regression + <strong>L2 penalty</strong> \(\lambda\sum\theta_j^2\) (the intercept is not penalised).</li>
+<li>λ (<code>alpha</code>) controls the trade-off: 0 = OLS, huge = flat line. Pick it by <strong>cross-validation</strong> (<code>RidgeCV</code>).</li>
+<li>It shrinks coefficients smoothly, stabilises them when features are correlated, and reduces overfitting (lower variance, slightly higher bias).</li>
+<li>Closed form: \(\theta=(X^TX+\lambda I)^{-1}X^Ty\). With one feature: \(\theta_1=S_{xy}/(S_{xx}+\lambda)\).</li>
+<li><strong>Always scale features first</strong>. Ridge never sets a coefficient exactly to zero.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>By hand: for the data (1, 2), (2, 4), (3, 5), (4, 8) compute the Ridge slope and intercept for λ = 2. What does it predict at x = 5?</li>
+<li>In scikit-learn, fit <code>Ridge(alpha=2)</code> to the same data and confirm.</li>
+<li>Bonus: on the California housing data, fit <code>LinearRegression</code> and <code>Ridge(alpha=100)</code> in a scaled pipeline. Compare the size of the coefficients (e.g. <code>abs(coef_).sum()</code>) and the test RMSE. Which is smaller? Does Ridge help here?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> θ₁ = 9.5 / (5 + 2) = 1.357; θ₀ = 4.75 − 1.357 × 2.5 = 1.357; prediction at x = 5: 1.357 + 1.357 × 5 = 8.143.</p>
+<p><b>2.</b> <code>Ridge(alpha=2).fit([[1],[2],[3],[4]],[2,4,5,8])</code> gives <code>coef_ = [1.357]</code>, <code>intercept_ = 1.357</code>.</p>
+<p><b>3.</b> The Ridge coefficients are smaller in total. On this dataset (few features, lots of data) the test RMSE is almost identical: Ridge helps most when features are correlated or data is scarce, which is a useful lesson in itself.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/ridge.js"></script>
+</body>
+</html>

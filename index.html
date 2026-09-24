@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ML, Visually: learn machine learning by doing</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-root="" data-topic="home">
+<article id="lesson">
+
+  <!-- HERO -->
+  <section class="band dark hero-band">
+    <div class="inner hero-grid">
+      <div class="hero-copy">
+        <div class="meta"><span class="chip">Free</span><span class="chip plain">No install</span><span class="chip plain">Runs in your browser</span></div>
+        <h1>Learn machine learning <span class="hl">by playing</span> <span class="sq">with it.</span></h1>
+        <p class="lede">Every algorithm on this site is explained in plain language with an analogy, worked by hand on a tiny dataset, shown as a live visualisation you can drag and tweak, and finished with the scikit-learn code and real-world uses.</p>
+        <div class="cta-row">
+          <a class="btn primary" href="topics/01-introduction.html">Start with the Introduction →</a>
+          <a class="btn" href="#syllabus">Browse the syllabus ↓</a>
+        </div>
+      </div>
+
+      <!-- Original ML illustration: robot, neural net, chart card, gear, data paths -->
+      <div class="hero-art" id="heroArt" aria-hidden="true">
+        <svg viewBox="0 0 640 600" xmlns="http://www.w3.org/2000/svg">
+          <!-- big blob backdrop -->
+          <path d="M120 300 C 80 170 230 60 360 90 C 500 120 600 230 560 370 C 530 480 420 560 300 540 C 190 520 150 420 120 300Z" fill="#ffd23f" stroke="#f6ecd9" stroke-width="6"/>
+          <!-- flowing data paths -->
+          <path d="M-10 520 C 110 430 230 590 380 480 S 590 330 660 400" fill="none" stroke="#ff6b5a" stroke-width="16" stroke-linecap="round"/>
+          <path class="flowdots" d="M-10 520 C 110 430 230 590 380 480 S 590 330 660 400" fill="none" stroke="#fffaf0" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 22"/>
+          <path d="M30 120 C 120 40 190 170 290 90 S 470 10 560 60" fill="none" stroke="#4d7cff" stroke-width="12" stroke-linecap="round"/>
+          <path class="flowdots" d="M30 120 C 120 40 190 170 290 90 S 470 10 560 60" fill="none" stroke="#fffaf0" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 20"/>
+          <path d="M560 250 C 620 300 600 420 520 470" fill="none" stroke="#ff8fb8" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 16"/>
+
+          <!-- gear -->
+          <g class="spin" style="transform-origin:520px 130px">
+            <circle cx="520" cy="130" r="50" fill="#ff9f1c" stroke="#1d1b1a" stroke-width="6"/>
+            <circle cx="520" cy="130" r="62" fill="none" stroke="#1d1b1a" stroke-width="18" stroke-dasharray="16 15.5"/>
+            <circle cx="520" cy="130" r="18" fill="#fffaf0" stroke="#1d1b1a" stroke-width="6"/>
+          </g>
+
+          <!-- neural network -->
+          <g class="fl" style="--d:.4s" stroke="#1d1b1a" stroke-width="4" stroke-linecap="round">
+            <path d="M60 230 L120 190 M60 230 L120 270 M60 290 L120 190 M60 290 L120 270 M120 190 L182 232 M120 270 L182 232 M120 190 L182 300 M120 270 L182 300" fill="none"/>
+            <circle cx="60" cy="230" r="15" fill="#9b6cff"/><circle cx="60" cy="290" r="15" fill="#9b6cff"/>
+            <circle cx="120" cy="190" r="15" fill="#2bb673"/><circle cx="120" cy="270" r="15" fill="#2bb673"/>
+            <circle cx="182" cy="232" r="15" fill="#ff8fb8"/><circle cx="182" cy="300" r="15" fill="#ff8fb8"/>
+          </g>
+
+          <!-- robot -->
+          <g class="fl" style="--d:0s">
+            <!-- antenna -->
+            <path d="M330 118 L330 74" stroke="#1d1b1a" stroke-width="7" stroke-linecap="round"/>
+            <circle cx="330" cy="64" r="15" fill="#ff8fb8" stroke="#1d1b1a" stroke-width="6"/>
+            <!-- ears -->
+            <rect x="222" y="170" width="24" height="54" rx="10" fill="#ff9f1c" stroke="#1d1b1a" stroke-width="6"/>
+            <rect x="414" y="170" width="24" height="54" rx="10" fill="#ff9f1c" stroke="#1d1b1a" stroke-width="6"/>
+            <!-- head -->
+            <rect x="238" y="112" width="184" height="140" rx="46" fill="#4d7cff" stroke="#1d1b1a" stroke-width="7"/>
+            <rect x="260" y="140" width="140" height="84" rx="34" fill="#fffaf0" stroke="#1d1b1a" stroke-width="6"/>
+            <circle cx="300" cy="176" r="12" fill="#1d1b1a"/><circle cx="360" cy="176" r="12" fill="#1d1b1a"/>
+            <circle cx="304" cy="171" r="4" fill="#fffaf0"/><circle cx="364" cy="171" r="4" fill="#fffaf0"/>
+            <path d="M296 202 Q330 226 364 202" fill="none" stroke="#1d1b1a" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="278" cy="200" r="7" fill="#ff8fb8" opacity=".9"/><circle cx="382" cy="200" r="7" fill="#ff8fb8" opacity=".9"/>
+            <!-- body -->
+            <rect x="262" y="262" width="136" height="128" rx="38" fill="#ff6b5a" stroke="#1d1b1a" stroke-width="7"/>
+            <rect x="284" y="288" width="92" height="76" rx="18" fill="#fffaf0" stroke="#1d1b1a" stroke-width="5"/>
+            <rect x="298" y="326" width="15" height="28" rx="4" fill="#2bb673" stroke="#1d1b1a" stroke-width="3"/>
+            <rect x="322" y="312" width="15" height="42" rx="4" fill="#ffd23f" stroke="#1d1b1a" stroke-width="3"/>
+            <rect x="346" y="300" width="15" height="54" rx="4" fill="#9b6cff" stroke="#1d1b1a" stroke-width="3"/>
+            <!-- legs -->
+            <rect x="286" y="388" width="24" height="46" rx="10" fill="#1d1b1a"/><rect x="350" y="388" width="24" height="46" rx="10" fill="#1d1b1a"/>
+            <ellipse cx="292" cy="438" rx="26" ry="12" fill="#ffd23f" stroke="#1d1b1a" stroke-width="6"/><ellipse cx="368" cy="438" rx="26" ry="12" fill="#ffd23f" stroke="#1d1b1a" stroke-width="6"/>
+            <!-- left arm holds a plot point -->
+            <path d="M262 300 Q 220 320 214 360" fill="none" stroke="#1d1b1a" stroke-width="16" stroke-linecap="round"/>
+            <path d="M262 300 Q 220 320 214 360" fill="none" stroke="#ff6b5a" stroke-width="7" stroke-linecap="round"/>
+            <circle cx="212" cy="368" r="14" fill="#ffd23f" stroke="#1d1b1a" stroke-width="6"/>
+            <!-- right arm waves -->
+            <g class="wave-arm">
+              <path d="M398 300 Q 450 290 470 240" fill="none" stroke="#1d1b1a" stroke-width="16" stroke-linecap="round"/>
+              <path d="M398 300 Q 450 290 470 240" fill="none" stroke="#ff6b5a" stroke-width="7" stroke-linecap="round"/>
+              <circle cx="472" cy="232" r="14" fill="#ffd23f" stroke="#1d1b1a" stroke-width="6"/>
+            </g>
+          </g>
+
+          <!-- chart card (extends past the blob) -->
+          <g class="fl" style="--d:1.2s">
+            <g transform="rotate(8 520 430)">
+              <rect x="440" y="360" width="170" height="130" rx="22" fill="#fffaf0" stroke="#1d1b1a" stroke-width="6"/>
+              <rect x="462" y="424" width="24" height="42" rx="6" fill="#ff6b5a" stroke="#1d1b1a" stroke-width="4"/>
+              <rect x="498" y="404" width="24" height="62" rx="6" fill="#4d7cff" stroke="#1d1b1a" stroke-width="4"/>
+              <rect x="534" y="386" width="24" height="80" rx="6" fill="#2bb673" stroke="#1d1b1a" stroke-width="4"/>
+              <path d="M458 400 L500 384 L540 376 L584 380" fill="none" stroke="#9b6cff" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 9"/>
+            </g>
+          </g>
+
+          <!-- dataset box -->
+          <g class="fl" style="--d:2s">
+            <g transform="rotate(-7 90 440)">
+              <rect x="30" y="400" width="120" height="86" rx="16" fill="#ff8fb8" stroke="#1d1b1a" stroke-width="6"/>
+              <path d="M30 430 H150 M30 458 H150 M70 400 V486 M110 400 V486" stroke="#1d1b1a" stroke-width="3.5"/>
+              <text x="78" y="422" font-family="Fredoka, sans-serif" font-weight="700" font-size="17" fill="#1d1b1a">csv</text>
+            </g>
+          </g>
+
+          <!-- scattered particles + symbols -->
+          <g class="fl" style="--d:.8s" stroke="#1d1b1a" stroke-width="4"><circle cx="190" cy="110" r="10" fill="#ff6b5a"/><circle cx="592" cy="200" r="9" fill="#9b6cff"/><circle cx="90" cy="360" r="8" fill="#2bb673"/><path d="M552 320 l14 24 h-28 z" fill="#ffd23f"/></g>
+          <g class="fl" style="--d:1.6s" font-family="Fredoka, sans-serif" font-weight="700" font-size="46" stroke="#1d1b1a" stroke-width="2.5">
+            <text x="118" y="132" fill="#ff8fb8">∑</text><text x="560" y="300" fill="#4d7cff">θ</text><text x="200" y="540" fill="#2bb673">ŷ</text><text x="400" y="590" fill="#ffd23f">∂</text>
+          </g>
+          <path class="fl" style="--d:2.4s" d="M510 40 v26 M497 53 h26" stroke="#fffaf0" stroke-width="6" stroke-linecap="round" fill="none"/>
+          <path class="fl" style="--d:.2s" d="M60 60 v26 M47 73 h26" stroke="#ffd23f" stroke-width="6" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+  <svg class="wave top" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true"><path d="M0 90 V50 C 180 100 320 0 520 40 S 820 100 1000 50 S 1300 0 1440 40 V90Z" fill="var(--bg)" stroke="none"/><path d="M0 50 C 180 100 320 0 520 40 S 820 100 1000 50 S 1300 0 1440 40" fill="none" stroke="#ff6b5a" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 16"/></svg>
+
+  <!-- HOW EACH LESSON WORKS -->
+  <section class="cream-band">
+    <div class="inner">
+      <h2>How each lesson works</h2>
+      <div class="stickers">
+        <div class="sticker"><h4>💡 Intuition first</h4><p>An everyday analogy before any formula.</p></div>
+        <div class="sticker"><h4>🧮 Math, by hand</h4><p>Every calculation on a 3–6 point dataset, number by number.</p></div>
+        <div class="sticker"><h4>🎛️ Playgrounds</h4><p>Drag points, move sliders, press Step, and watch the algorithm respond.</p></div>
+        <div class="sticker"><h4>🐍 scikit-learn code</h4><p>The exact syntax, with every parameter explained.</p></div>
+        <div class="sticker"><h4>🌍 Real-world use</h4><p>Where companies actually use it, and what breaks in practice.</p></div>
+        <div class="sticker"><h4>✍️ Optional task</h4><p>A small exercise at the end, and you can skip it and move on.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYLLABUS JOURNEY -->
+  <section class="journey-band" id="syllabus">
+    <div class="inner">
+      <h2>The syllabus</h2>
+      <div class="journey" id="syl"></div>
+    </div>
+  </section>
+</article>
+<script src="js/topics.js"></script>
+<script src="js/lib/viz.js"></script>
+<script src="js/layout.js"></script>
+<script>
+  ML.ready(function () {
+    var host = document.getElementById("syl");
+    var colors = ["var(--coral)", "var(--yellow)", "var(--pink)", "var(--green)", "var(--blue)", "var(--orange)", "var(--purple)"];
+    var done = []; try { done = JSON.parse(localStorage.getItem("ml-done") || "[]"); } catch (e) {}
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    host.append(svg);
+    ML.topics.forEach(function (s, i) {
+      var m = s.section.match(/^(\d+) · (.*)$/);
+      var stop = ML.h("div", { class: "stop", style: "--sc:" + colors[i % colors.length] });
+      stop.append(ML.h("div", { class: "bdg" }, m ? m[1] : String(i + 1)));
+      var body = ML.h("div");
+      body.append(ML.h("h4", {}, m ? m[2] : s.section));
+      var ul = ML.h("ul");
+      s.items.forEach(function (t) {
+        var isDone = t.ready && done.indexOf(t.id) > -1;
+        ul.append(ML.h("li", { class: (t.ready ? "ready" : "soon") + (isDone ? " doneli" : ""), style: t.sub ? "padding-left:16px" : "" },
+          ML.h("span", { class: "dotn" }), ML.h("a", { href: t.ready ? t.href : "#" }, t.title), ML.h("span", { class: "st" }, t.ready ? (isDone ? "Done ✓" : "Ready") : "Soon")));
+      });
+      body.append(ul); stop.append(body); host.append(stop);
+    });
+    /* curved path travelling through every stop badge */
+    function drawPath() {
+      var stops = [].slice.call(host.querySelectorAll(".stop")), hb = host.getBoundingClientRect();
+      var pts = stops.map(function (s) { var b = s.querySelector(".bdg").getBoundingClientRect(); return { x: b.left - hb.left + b.width / 2, y: b.top - hb.top + b.height / 2 }; });
+      svg.innerHTML = "";
+      if (pts.length < 2) return;
+      var d = "M" + pts[0].x + " " + (pts[0].y - 40);
+      var all = [{ x: pts[0].x, y: pts[0].y - 40 }].concat(pts);
+      for (var i = 0; i < all.length - 1; i++) {
+        var a = all[i], b = all[i + 1], my = (a.y + b.y) / 2;
+        if (i) d += " C" + a.x + " " + my + " " + b.x + " " + my + " " + b.x + " " + b.y;
+        else d += " C" + a.x + " " + my + " " + b.x + " " + my + " " + b.x + " " + b.y;
+      }
+      var cols = ["#ff6b5a", "#ffd23f", "#ff8fb8", "#2bb673", "#4d7cff", "#ff9f1c", "#9b6cff"];
+      var g = document.createElementNS(NS, "defs"), lg = document.createElementNS(NS, "linearGradient");
+      lg.setAttribute("id", "jg"); lg.setAttribute("gradientUnits", "userSpaceOnUse"); lg.setAttribute("x1", 0); lg.setAttribute("y1", 0); lg.setAttribute("x2", 0); lg.setAttribute("y2", hb.height);
+      cols.forEach(function (c, k) { var st = document.createElementNS(NS, "stop"); st.setAttribute("offset", (k / (cols.length - 1)) * 100 + "%"); st.setAttribute("stop-color", c); lg.append(st); });
+      g.append(lg); svg.append(g);
+      var p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("class", "jp"); p.setAttribute("stroke", "url(#jg)"); svg.append(p);
+      svg.setAttribute("viewBox", "0 0 " + hb.width + " " + hb.height);
+    }
+    drawPath(); window.addEventListener("resize", drawPath); if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawPath);
+    /* hero art follows the cursor a little */
+    var art = document.getElementById("heroArt"), band = document.querySelector(".hero-band");
+    if (art && band && matchMedia("(pointer:fine)").matches) band.addEventListener("mousemove", function (e) {
+      var r = band.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      art.style.transform = "translate(" + (x * -22).toFixed(1) + "px," + (y * -14).toFixed(1) + "px) rotate(" + (x * 2).toFixed(2) + "deg)";
+    });
+  });
+</script>
+</body>
+</html>

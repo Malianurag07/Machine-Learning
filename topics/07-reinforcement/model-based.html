@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model-Based RL · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="mbased">
+<article id="lesson">
+
+<h1>Reinforcement Learning: Model-Based Methods</h1>
+<p class="lede">In reinforcement learning (RL) an agent learns what to <em>do</em> by trying things and receiving rewards, instead of being shown correct answers. Model-based methods start from a simple idea: <strong>if you know how the world works, you can plan</strong>, working out the best behaviour by calculation before taking a single risky step. This lesson introduces the RL vocabulary, then the two classic planning algorithms, value iteration and policy iteration.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 95 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: learning from rewards</h2>
+<p>In supervised learning every example comes with the right answer. In RL there is no answer key. An <strong>agent</strong> acts in an <strong>environment</strong>; after each action the environment moves to a new situation and gives back a number, the <strong>reward</strong> (positive is good, negative is bad). The agent's goal is to collect as much reward as possible over time. The catch: the consequences of an action can arrive much later (a chess move, a turn in a maze), and the agent's own actions decide what data it sees next.</p>
+<div class="callout analogy"><p><strong>Finding your way in a new city.</strong> You want to reach a café. A model-based traveller studies a <em>map</em> first: which streets connect, how long each takes, where the roads are closed. With the map, she plans the whole route on paper and only then sets off. A model-free traveller has no map and learns by wandering, remembering which turns paid off. This lesson is about the map-reader; the next lesson is about the wanderer. The "map" in RL is called the <strong>model</strong>.</p></div>
+<div class="tw"><table>
+<tr><th>Term</th><th>Meaning</th><th>Example (a robot in a corridor)</th></tr>
+<tr><td><strong>Agent</strong></td><td>the learner / decision-maker</td><td>the robot</td></tr>
+<tr><td><strong>Environment</strong></td><td>everything the agent interacts with</td><td>the corridor, its floor, the doors</td></tr>
+<tr><td><strong>State</strong> s</td><td>a description of the current situation</td><td>which cell the robot is in</td></tr>
+<tr><td><strong>Action</strong> a</td><td>what the agent can do</td><td>move left, move right</td></tr>
+<tr><td><strong>Reward</strong> r</td><td>immediate feedback after an action</td><td>−1 for each step (battery), +10 for reaching the charger</td></tr>
+<tr><td><strong>Policy</strong> π</td><td>the agent's rule for choosing actions: "in state s, do a"</td><td>"always go right"</td></tr>
+<tr><td><strong>Episode</strong></td><td>one run from the start to a terminal state</td><td>from the start cell until a prize is reached</td></tr>
+<tr><td><strong>Return</strong> G</td><td>the total (discounted) reward collected over an episode</td><td>the sum of all the rewards on the way</td></tr>
+</table></div>
+<h3>The return and the discount</h3>
+<p>A reward now is worth more than the same reward much later (it may never come, and waiting has costs). The <strong>discount factor γ</strong> (gamma, between 0 and 1) expresses this: a reward received k steps in the future counts γ<sup>k</sup> times as much. The <strong>return</strong> is</p>
+<p style="text-align:center"><b>G = r₁ + γ r₂ + γ² r₃ + γ³ r₄ + …</b></p>
+<div class="callout math"><p>Example with γ = 0.9: rewards −1, −1, +10 over three steps give G = −1 + 0.9 × (−1) + 0.9² × 10 = −1 − 0.9 + 8.1 = <b>6.2</b>. The same +10 reward received ten steps later would be worth only 10 × 0.9<sup>10</sup> = <b>3.49</b>. With γ near 0 the agent is short-sighted (only immediate rewards matter); with γ near 1 it is far-sighted.</p></div>
+
+<h2>2. The Markov decision process (MDP)</h2>
+<p>Most of RL theory uses one mathematical setting, the <strong>Markov decision process</strong>, which has five ingredients:</p>
+<ul>
+<li>a set of <strong>states</strong> S and a set of <strong>actions</strong> A,</li>
+<li>the <strong>transition probabilities</strong> P(s′ | s, a): if the agent takes action a in state s, the chance of ending up in state s′ (the world can be uncertain: a wheel slips, a die is rolled),</li>
+<li>the <strong>rewards</strong> R(s, a, s′),</li>
+<li>the discount γ.</li>
+</ul>
+<p>"<strong>Markov</strong>" means the future depends only on the <em>current</em> state and action, not on the earlier history: the state contains everything you need to know. P and R together are the <strong>model</strong> of the environment.</p>
+<h3>Value functions: how good is a state?</h3>
+<p>To choose well, the agent needs to know how promising each state is. The <strong>value</strong> of a state under a policy, V<sup>π</sup>(s), is the return the agent can <em>expect</em> if it starts in s and follows π. The <strong>action value</strong> Q<sup>π</sup>(s, a) is the expected return if it takes action a first, and follows π afterwards. The best achievable values are V* and Q* ("optimal"), and a policy that acts greedily with respect to Q* is optimal.</p>
+<div class="callout math"><p><strong>The Bellman equation</strong> (the key identity of RL). The value of a state is the expected immediate reward plus the discounted value of where you end up:</p>
+<p style="text-align:center"><b>Q(s, a) = Σ<sub>s′</sub> P(s′ | s, a) × [ r + γ × V(s′) ]</b> &nbsp;&nbsp; and &nbsp;&nbsp; <b>V*(s) = the largest Q*(s, a) over the actions a</b></p>
+<p>In words: <em>"Look one step ahead: average over what might happen, add the reward you get, add the (discounted) value of the next state, and pick the best action."</em> The values of neighbouring states are tied together by this equation, and solving these equations solves the whole problem.</p></div>
+
+<h2>3. Model-based versus model-free</h2>
+<div class="tw"><table>
+<tr><th></th><th>Model-based</th><th>Model-free</th></tr>
+<tr><td>Knows P and R?</td><td>Yes, given or learned</td><td>No: never builds one</td></tr>
+<tr><td>How it finds a policy</td><td>plans by calculation using the model (dynamic programming, tree search)</td><td>learns values or a policy directly from experience (Q-learning, SARSA, policy gradients): next lesson</td></tr>
+<tr><td>Data needed</td><td>little, once the model is accurate: the model can be reused for any goal</td><td>usually a lot of trial and error</td></tr>
+<tr><td>Weak point</td><td>a wrong model gives confidently wrong plans; hard to model complex worlds</td><td>slow and sample-hungry</td></tr>
+</table></div>
+<p>This lesson has two parts: <strong>planning</strong> when the model is known (sections 4 to 7), and <strong>learning the model</strong> from experience when it is not (section 8).</p>
+
+<h2>4. Value iteration</h2>
+<p>Value iteration finds the optimal values by applying the Bellman equation over and over as an update:</p>
+<ol>
+<li>Start with V(s) = 0 for every state (terminal states keep the value of their reward).</li>
+<li><strong>Sweep:</strong> for every state s, compute Q(s, a) for each action a from the <em>current</em> values, and set the new V(s) to the largest one.</li>
+<li>Repeat the sweep until the values stop changing.</li>
+<li>Read off the <strong>policy</strong>: in every state, the action with the largest Q.</li>
+</ol>
+<p>Each sweep pushes information one step further through the state space: rewards near the prizes spread outward like ripples until the values are consistent everywhere. It is guaranteed to converge (for γ &lt; 1) to the optimal values.</p>
+<h3>By hand: a robot in a corridor</h3>
+<p>A corridor of five cells: <b>[small prize 5] – s1 – s2 – s3 – [big prize 10]</b>. The robot can try to move left or right. Moves are <em>unreliable</em>: with probability 0.8 it moves in the intended direction, and with probability 0.2 it slips and moves the other way. Every step costs 1 (reward −1). Reaching either end ends the episode with the prize. γ = 0.9. Terminal states have a fixed value equal to their prize (5 and 10), and s1, s2, s3 start at 0.</p>
+<div class="callout math">
+<p><strong>Sweep 1</strong> (uses V = 5, 0, 0, 0, 10):</p>
+<ul>
+<li><b>s1</b>: going left: 0.8 × (−1 + 0.9 × 5) + 0.2 × (−1 + 0.9 × 0) = 0.8 × 3.5 − 0.2 = <b>2.6</b>. Going right: 0.8 × (−1 + 0) + 0.2 × (−1 + 4.5) = −0.8 + 0.7 = −0.1. Best: left, V(s1) = <b>2.6</b>.</li>
+<li><b>s2</b>: both directions lead to states with value 0: −1 whichever way. V(s2) = <b>−1</b>.</li>
+<li><b>s3</b>: going right: 0.8 × (−1 + 0.9 × 10) + 0.2 × (−1 + 0) = 6.4 − 0.2 = <b>6.2</b>. Going left is worse (0.8). V(s3) = <b>6.2</b>.</li>
+</ul>
+<p><strong>Sweep 2</strong> (uses V = 5, 2.6, −1, 6.2, 10). For instance <b>s2</b>: going right: 0.8 × (−1 + 0.9 × 6.2) + 0.2 × (−1 + 0.9 × 2.6) = 0.8 × 4.58 + 0.2 × 1.34 = 3.664 + 0.268 = <b>3.932</b>; going left is only 1.988. So V(s2) = 3.932. The other two: V(s1) = 2.42, V(s3) = 6.02.</p></div>
+<div class="tw"><table>
+<tr><th>Sweep</th><th class="num">V(s1)</th><th class="num">V(s2)</th><th class="num">V(s3)</th></tr>
+<tr><td>0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>1</td><td class="num">2.600</td><td class="num">−1.000</td><td class="num">6.200</td></tr>
+<tr><td>2</td><td class="num">2.420</td><td class="num">3.932</td><td class="num">6.020</td></tr>
+<tr><td>3</td><td class="num">3.308</td><td class="num">3.770</td><td class="num">6.908</td></tr>
+<tr><td>4</td><td class="num">3.279</td><td class="num">4.569</td><td class="num">6.879</td></tr>
+<tr><td>5</td><td class="num">3.422</td><td class="num">4.543</td><td class="num">7.022</td></tr>
+<tr><td>6</td><td class="num">3.418</td><td class="num">4.672</td><td class="num">7.018</td></tr>
+<tr><td>10</td><td class="num">3.444</td><td class="num">4.692</td><td class="num">7.044</td></tr>
+<tr><td><b>converged</b></td><td class="num"><b>3.445</b></td><td class="num"><b>4.692</b></td><td class="num"><b>7.045</b></td></tr>
+</table></div>
+<p><strong>The policy.</strong> With the converged values, the action values (left | right) are: s1: 3.445 | 3.278; s2: 2.748 | 4.692; s3: 4.178 | 7.045. So the optimal policy is <b>s1 → left, s2 → right, s3 → right</b>. From s1 the robot goes to the <em>near, smaller prize</em>; from the other two states it heads for the far, big prize. That is an interesting result: a farther, bigger reward is not always the best target, because every step costs 1 and every step risks a slip. The next demo lets you change these numbers:</p>
+<div class="demo" data-title="Value iteration on the corridor" id="demo-corridor">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>Press "Sweep" and compare with the table above.</li>
+<li>Make each step <b>cheaper</b> (−0.1): the arrow at s1 flips to the right, since the big prize is worth the walk.</li>
+<li>Set the slip to <b>0</b> (a perfectly reliable robot) with the default cost: s1 also goes right. (By hand: V(s3) = −1 + 0.9 × 10 = 8, V(s2) = −1 + 0.9 × 8 = 6.2, and going right from s1 gives −1 + 0.9 × 6.2 = 4.58, beating the 3.5 you get by going left.)</li>
+<li>Lower γ: a short-sighted robot values the near prize more.</li>
+</ul>
+
+<h2>5. Policy iteration</h2>
+<p>Value iteration improves the <em>values</em> directly and reads the policy off at the end. <strong>Policy iteration</strong> alternates two steps that work on a <em>policy</em>:</p>
+<ol>
+<li><strong>Policy evaluation:</strong> for the current policy π, compute how good it is: the values V<sup>π</sup> (by solving the Bellman equations for π: no maximisation, just follow the policy's action in each state; or by sweeping until they stop changing).</li>
+<li><strong>Policy improvement:</strong> in every state, switch to the action with the largest Q under those values. (If nothing changes, π is optimal and we stop.)</li>
+</ol>
+<p>Each improvement can only make the policy better (or leave it unchanged), and there are finitely many policies, so it terminates at the optimal one, usually in only a few rounds.</p>
+<div class="callout math">
+<p><strong>On our corridor.</strong> Start with the naive policy "always right". <b>Evaluate:</b> V<sup>π</sup> = 3.249, 4.652, 7.037 for s1, s2, s3. <b>Improve:</b> at s1, going left is worth 0.8 × (−1 + 0.9 × 5) + 0.2 × (−1 + 0.9 × 4.652) = 2.8 + 0.637 = <b>3.437</b> compared with 3.249 for going right: switch to left. At s2 and s3 the right action is still best (s2: 4.652 vs 2.606; s3: 7.037 vs 4.149). New policy: <b>left, right, right</b>.</p>
+<p><b>Evaluate again:</b> V<sup>π</sup> = 3.445, 4.692, 7.045. <b>Improve:</b> nothing wants to change. <b>Done after 2 rounds:</b> the same optimal policy value iteration found (I checked with a program). Value iteration needed about 10 sweeps for the same accuracy.</p></div>
+
+<h2>6. A bigger world: the classic 4 × 3 grid</h2>
+<p>The same ideas, on the standard textbook example. The agent starts at the bottom left. The top-right cell is a <b>goal (+1)</b>, the cell below it a <b>pit (−1)</b>, and the grey cell is a wall. Each move has an 80% chance of going the intended way and 10% each of slipping to the left or right of it (bumping into a wall or the edge leaves the agent where it is). Each step costs 0.04.</p>
+<div class="demo" data-title="Value iteration on a gridworld" id="demo-grid">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>Press "Run to convergence" with the default settings: the values match the textbook (0.812, 0.868, 0.918 in the top row; 0.705, 0.655, 0.611, 0.388 in the bottom row). Notice the route: the agent goes <em>up the left side and along the top</em>, the longer way, to stay away from the pit: it is worth walking further to avoid a 10% chance of slipping into −1.</li>
+<li><b>"Compare over 1000 episodes":</b> the average return of the planned policy matches the value predicted for the start cell, while random moves earn far less. The value function really is a prediction of the return.</li>
+<li><b>Cost per step</b> shapes the behaviour. At −2 per step the agent hurries to end the episode, even into the pit. With a small positive reward per step (+0.05) it avoids the ends entirely and wanders around collecting reward. Designing the reward is half the art of RL.</li>
+<li><b>Slip probability 0:</b> there is no risk any more, so no detour is needed: a shortest path of 5 steps works (there are two), and the value of the start cell becomes exactly 1 − 5 × 0.04 = <b>0.800</b>.</li>
+</ul>
+<p>And the same problem solved by policy iteration (with γ = 0.9). Alternate "evaluate" and "improve" and watch the arrows change:</p>
+<div class="demo" data-title="Policy iteration on the gridworld" id="demo-policyit">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>7. Planning in code</h2>
+<p>Value iteration needs only the model (P and R) and a few lines of code. This version reproduces the grid above with NumPy (run in my environment; the printed values are the textbook values):</p>
+<pre class="code">
+import numpy as np
+
+ROWS, COLS, WALL = 3, 4, (1, 1)
+TERMINAL = {(0, 3): 1.0, (1, 3): -1.0}
+ACTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]          # up, down, left, right
+LIVING, GAMMA, SLIP = -0.04, 1.0, 0.2
+
+def move(r, c, a):                                     # deterministic move, bump into walls and edges
+    nr, nc = r + a[0], c + a[1]
+    return (r, c) if not (0 &lt;= nr &lt; ROWS and 0 &lt;= nc &lt; COLS) or (nr, nc) == WALL else (nr, nc)
+
+def outcomes(a):                                       # the model: (probability, actual move)
+    side = [(0, -1), (0, 1)] if a[0] != 0 else [(-1, 0), (1, 0)]
+    return [(1 - SLIP, a), (SLIP / 2, side[0]), (SLIP / 2, side[1])]
+
+V = np.zeros((ROWS, COLS))
+for (r, c), reward in TERMINAL.items(): V[r, c] = reward
+for sweep in range(500):
+    new = V.copy()
+    for r in range(ROWS):
+        for c in range(COLS):
+            if (r, c) in TERMINAL or (r, c) == WALL: continue
+            new[r, c] = max(sum(p * (LIVING + GAMMA * V[move(r, c, act)]) for p, act in outcomes(a)) for a in ACTIONS)
+    V = new
+print(V.round(3))
+# [[ 0.812  0.868  0.918  1.   ]
+#  [ 0.762  0.     0.66  -1.   ]
+#  [ 0.705  0.655  0.611  0.388]]
+</pre>
+<p>Now a standard benchmark with a built-in model: <b>FrozenLake</b> from the <code>gymnasium</code> library (<code>pip install gymnasium</code>). A 4 × 4 frozen lake: reach the goal without falling into a hole; the ice is slippery, so the robot moves in the intended direction only a third of the time (it slips to either side otherwise). The environment exposes its full model as <code>env.unwrapped.P[state][action]</code>, a list of (probability, next state, reward, done). All results below are from an actual run (gymnasium 1.3.0):</p>
+<pre class="code">
+import gymnasium as gym, numpy as np
+env = gym.make("FrozenLake-v1", is_slippery=True)
+P, nS, nA = env.unwrapped.P, 16, 4                     # P[s][a] = [(prob, next_state, reward, done), ...]
+
+def q_values(V, gamma):
+    return np.array([[sum(p * (r + gamma * V[s2] * (not done)) for p, s2, r, done in P[s][a]) for a in range(nA)] for s in range(nS)])
+
+V = np.zeros(nS)
+while True:                                            # value iteration
+    V_new = q_values(V, 0.99).max(axis=1)
+    if np.abs(V_new - V).max() &lt; 1e-10: break
+    V = V_new
+policy = q_values(V, 0.99).argmax(axis=1)
+print(V.reshape(4, 4).round(3)[0])                     # [0.542 0.499 0.471 0.457]   value of the start cell: 0.542
+print(policy.reshape(4, 4))                            # [[0 3 3 3] [0 0 0 0] [3 1 0 0] [0 2 1 0]]   0=left 1=down 2=right 3=up
+
+# how good is the plan? run it in the real environment
+# success rate of the planned policy: 74.8% (10,000 episodes; the environment stops an episode after 100 steps)
+# success rate of random actions:       1.3% (5,000 episodes)
+# without the 100-step limit the exact success probability of the planned policy is 82.4%
+# policy iteration reaches exactly the same policy, in 7 rounds of evaluate + improve
+</pre>
+<p>With the plan the robot reaches the goal about three times in four; with random actions, one time in eighty. Notice something surprising in the policy printed above: in the top row it says "up" (3) and "left" (0), i.e. it walks <em>into walls</em> on purpose. On slippery ice, pushing against the edge is the safest way to shuffle sideways without slipping into a hole. That is planning under uncertainty at work.</p>
+
+<h2>8. When the model is not known: learn it, then plan</h2>
+<p>Real environments rarely come with P and R. The model-based answer is to <strong>learn the model from experience</strong>, then plan with it:</p>
+<ol>
+<li><strong>Explore:</strong> take actions and record every transition (s, a, r, s′).</li>
+<li><strong>Estimate</strong> the model by counting: P̂(s′ | s, a) = (times action a in state s led to s′) ÷ (times a was tried in s); R̂ likewise as the average reward seen.</li>
+<li><strong>Plan</strong> with the estimated model, exactly as in sections 4 to 7 (this is sometimes called <em>certainty equivalence</em>: act as if the estimate were the truth).</li>
+<li>Keep exploring, updating the counts and re-planning as the model improves.</li>
+</ol>
+<p>A tiny example: the robot tries "right" from s2 twenty times and observes 15 successes (moves right) and 5 slips (moves left). It estimates P̂(right → success) = 15 ÷ 20 = 0.75 (true value 0.8) and plans with that.</p>
+<p>On FrozenLake I tested it: the agent moves around with <b>purely random actions</b> for N steps, learns P̂ and R̂ from the counts, plans with value iteration, and the resulting policy is evaluated exactly in the <em>real</em> lake (the best possible value at the start is 0.542; average of 5 runs):</p>
+<div class="tw"><table>
+<tr><th class="num">Random steps of experience</th><th class="num">500</th><th class="num">2,000</th><th class="num">10,000</th><th class="num">100,000</th></tr>
+<tr><td>True value of the planned policy at the start</td><td class="num">0.114</td><td class="num">0.323</td><td class="num">0.530</td><td class="num">0.542</td></tr>
+</table></div>
+<p>With very little experience the model is wrong in places and the plan is poor; with 10,000 steps it is almost optimal (98%), and with 100,000 it reaches the optimum. This is the essence of model-based RL: <em>invest experience in an accurate model, then extract behaviour by computation</em>.</p>
+<h3>Ideas built on this</h3>
+<ul>
+<li><strong>Dyna:</strong> mix real experience with <em>imagined</em> experience generated from the learned model, so each real step is used many times.</li>
+<li><strong>Planning at decision time:</strong> instead of solving for every state in advance, search forward from the current state with the model (<em>Monte-Carlo tree search</em>, model-predictive control). This is how game-playing systems and many robot controllers work.</li>
+<li><strong>Learned neural-network models:</strong> for large problems the model (and value function) are neural networks. Famous game systems combine a model with tree search, learning values and policies as they go.</li>
+</ul>
+
+<h2>9. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Very efficient with data once the model is good: planning costs computation, not real-world trials</td><td>Needs a model: exact (a game's rules) or learned. Errors in the model become errors in the plan</td></tr>
+<tr><td>The model can be reused for new goals (change the reward and re-plan)</td><td>Dynamic programming sweeps every state: infeasible for huge or continuous state spaces without approximation</td></tr>
+<tr><td>Can plan safely "in simulation" before acting</td><td>Complex worlds (images, other people) are hard to model accurately</td></tr>
+<tr><td>Transparent: values and plans can be inspected</td><td>Uncertainty in the model must be handled carefully, or the agent can be overconfident</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🎲 Board games</h4><p>The rules are the perfect model: search and planning with them are the backbone of chess, Go and similar game programs.</p></div>
+<div class="card"><h4>🤖 Robotics and control</h4><p>Model-predictive control plans a few seconds ahead with a physical model, replanning constantly (robot arms, drones, self-balancing machines).</p></div>
+<div class="card"><h4>📦 Inventory and operations</h4><p>Stock ordering, machine maintenance and staffing are classic MDPs solved by dynamic programming: the model comes from demand statistics.</p></div>
+<div class="card"><h4>🚗 Route and motion planning</h4><p>Choosing routes and manoeuvres under uncertain traffic or obstacles, from a model of how they move.</p></div>
+<div class="card"><h4>🏥 Treatment planning</h4><p>Sequences of treatment decisions, planned with models of how patients respond, then checked by clinicians.</p></div>
+<div class="card"><h4>⚡ Energy systems</h4><p>Battery charging and building climate control are planned with models of demand, prices and weather.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>RL: an <strong>agent</strong> takes <strong>actions</strong> in an <strong>environment</strong>, receives <strong>rewards</strong>, and learns a <strong>policy</strong> that maximises the (discounted) <strong>return</strong> G = r₁ + γr₂ + γ²r₃ + … (rewards −1, −1, +10 at γ = 0.9 give 6.2).</li>
+<li>An <strong>MDP</strong> is states, actions, transition probabilities P, rewards R and γ. P and R are the <strong>model</strong>.</li>
+<li>The <strong>Bellman equation</strong>: Q(s, a) = Σ P(s′|s, a) [r + γ V(s′)], and V*(s) = max<sub>a</sub> Q*(s, a).</li>
+<li><strong>Value iteration</strong> sweeps this update until the values converge, then acts greedily. On our corridor: 2.6, −1, 6.2 → … → 3.445, 4.692, 7.045, giving the policy left, right, right.</li>
+<li><strong>Policy iteration</strong> alternates evaluating a policy and improving it; it finished in 2 rounds on the corridor and 7 on FrozenLake.</li>
+<li>If the model is unknown, <strong>learn it from counts and plan with it</strong>: on FrozenLake 10,000 random steps gave 98% of the optimal value. Model errors become plan errors, so accuracy matters.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>Compute the return of the reward sequence 2, 2, 2, 10 with γ = 0.5.</li>
+<li>In the corridor, the robot in s3 goes right: with probability 0.8 it reaches the big prize (10), with probability 0.2 it slips left to s2 whose current value is 0. With cost 1 per step and γ = 0.9, compute Q(s3, right).</li>
+<li>Why does the robot go <em>left</em> from s1 in the lesson's corridor but <em>right</em> when each step costs only 0.1?</li>
+<li>What is the difference between policy evaluation and policy improvement?</li>
+<li>Bonus: install gymnasium and run the FrozenLake code. Change <code>gamma</code> from 0.99 to 0.9. Does the policy change?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> G = 2 + 0.5 × 2 + 0.25 × 2 + 0.125 × 10 = 2 + 1 + 0.5 + 1.25 = <b>4.75</b>.</p>
+<p><b>2.</b> Q = 0.8 × (−1 + 0.9 × 10) + 0.2 × (−1 + 0.9 × 0) = 0.8 × 8 + 0.2 × (−1) = 6.4 − 0.2 = <b>6.2</b> (the value found in sweep 1).</p>
+<p><b>3.</b> Each step costs a battery unit and risks a slip, so the far big prize is expensive to reach. When steps cost 1, from s1 the near small prize (5) beats the big one (10): 3.445 versus 3.278. When steps are cheap, the extra 5 points of reward are worth the walk, so going right wins.</p>
+<p><b>4.</b> Evaluation <b>measures</b> a fixed policy: it computes V<sup>π</sup> for the policy as it is. Improvement <b>changes</b> the policy: in each state it picks the action with the highest Q under those values. Policy iteration alternates the two until improvement changes nothing.</p>
+<p><b>5.</b> I did not run that variation. With a lower γ the agent cares less about the distant goal, so expect the values to shrink and possibly a few actions in cells far from the goal to change; check by printing both policies.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/model-based.js"></script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LASSO Regression · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="lasso">
+<article id="lesson">
+
+<h1>LASSO Regression</h1>
+<p class="lede">LASSO is Ridge's stricter sibling. It also shrinks the coefficients, but it pushes the useless ones all the way to exactly zero, so it picks the important features for you.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 60 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. From "make weights small" to "delete the useless ones"</h2>
+<p>Ridge (previous lesson) keeps <em>every</em> feature and just makes the weights smaller. That is great for stability, but sometimes you have 100 features and you suspect only 5 really matter. You would like the model to tell you <em>which</em> 5, and ignore the rest. That is exactly what <strong>LASSO</strong> does. The name stands for <strong>L</strong>east <strong>A</strong>bsolute <strong>S</strong>hrinkage and <strong>S</strong>election <strong>O</strong>perator: it <em>shrinks</em> weights and <em>selects</em> features at the same time.</p>
+<div class="callout analogy"><p><strong>Packing a suitcase with a weight limit.</strong> Ridge is like shrinking every item a little so everything fits. LASSO is like an airline's strict limit: you can't take everything, so you leave the least useful things at home <em>completely</em>, and pack only what earns its place. A weight of exactly 0 means "this feature stayed at home".</p></div>
+<p>Why would you want that?</p>
+<ul>
+<li><strong>Simpler, easier to explain.</strong> "Price depends on area, location and age" beats "price depends on 87 things".</li>
+<li><strong>Less overfitting.</strong> Fewer features means fewer chances to memorise noise.</li>
+<li><strong>Cheaper.</strong> Fewer features to collect, store and compute in production.</li>
+</ul>
+
+<h2>2. The LASSO cost function</h2>
+<p>Same idea as Ridge (fit the data <em>and</em> keep weights in check), but the penalty uses the <strong>absolute value</strong> of each weight instead of its square. This is called the <strong>L1 penalty</strong>.</p>
+$$J(\theta)=\underbrace{\frac1{2n}\sum_{i=1}^{n}\big(h_\theta(x_i)-y_i\big)^2}_{\text{average squared mistake}}\;+\;\underbrace{\lambda\sum_{j=1}^{k}|\theta_j|}_{\text{L1 penalty}}$$
+<p><strong>In words:</strong> LASSO cost = (average squared mistake) + λ × (the sum of the sizes of the weights, ignoring sign).</p>
+<div class="tw"><table>
+<tr><th></th><th>Ridge (L2)</th><th>LASSO (L1)</th></tr>
+<tr><td>Penalty</td><td>λ × sum of <em>squared</em> weights</td><td>λ × sum of <em>absolute</em> weights</td></tr>
+<tr><td>Punishes…</td><td>big weights a lot, tiny weights hardly at all</td><td>every weight by the same rate, however small</td></tr>
+<tr><td>Result</td><td>Small but non-zero weights</td><td>Some weights become <strong>exactly 0</strong></td></tr>
+</table></div>
+<p>λ is the strength (in scikit-learn it is <code>alpha</code>; this lesson's formula is exactly scikit-learn's <code>Lasso</code> objective, so λ = alpha). λ = 0 gives plain linear regression; a very large λ makes every weight 0, which leaves only the intercept (a flat line at the average).</p>
+<div class="callout tip"><p><strong>Why does an absolute value create zeros while a square doesn't?</strong> Squaring a tiny number makes it <em>tinier still</em> (0.1² = 0.01), so the L2 penalty has almost no pull on small weights and never finishes the job. The absolute value pulls with the <em>same force</em> whether the weight is big or tiny (|0.1| = 0.1), so it can drag a small weight the whole way to zero and hold it there.</p></div>
+
+<h2>3. LASSO by hand: one feature</h2>
+<p>Take the data from the last two lessons: (1, 2), (2, 4), (3, 5), (4, 8), with n = 4 points. Recall S<sub>xy</sub> = 9.5 ("how x and y move together") and S<sub>xx</sub> = 5 ("how spread out x is"). Plain regression gives slope = 9.5 ÷ 5 = 1.9. For LASSO the rule is wonderfully simple:</p>
+<div class="callout math">
+<p><strong>slope = (S<sub>xy</sub> − pull) ÷ S<sub>xx</sub>, where pull = n × λ.</strong> If the pull is bigger than S<sub>xy</sub>, nothing is left and the slope is <strong>exactly 0</strong>. Then intercept = average y − slope × average x (average x = 2.5, average y = 4.75).</p>
+<div class="tw"><table>
+<tr><th>λ</th><th>pull = 4 × λ</th><th>slope = (9.5 − pull) ÷ 5</th><th>intercept</th><th>Prediction at x = 5</th></tr>
+<tr><td class="num">0 (plain)</td><td class="num">0</td><td class="num"><b>1.90</b></td><td class="num">0.00</td><td class="num">9.50</td></tr>
+<tr><td class="num">0.5</td><td class="num">2</td><td class="num"><b>1.50</b></td><td class="num">1.00</td><td class="num">8.50</td></tr>
+<tr><td class="num">1</td><td class="num">4</td><td class="num"><b>1.10</b></td><td class="num">2.00</td><td class="num">7.50</td></tr>
+<tr><td class="num">2</td><td class="num">8</td><td class="num"><b>0.30</b></td><td class="num">4.00</td><td class="num">5.50</td></tr>
+<tr><td class="num">3</td><td class="num">12 (more than 9.5!)</td><td class="num"><b>0 (exactly)</b></td><td class="num">4.75</td><td class="num">4.75</td></tr>
+</table></div>
+<p><strong>Compare with Ridge</strong> on the same data: Ridge's slope went 1.9 → 1.58 → 0.95 → 0.38 as λ grew; it <em>divides</em> the slope by a bigger number, so it shrinks towards zero without ever reaching it. LASSO <em>subtracts a fixed amount</em>, so once the pull is bigger than the evidence, the slope hits zero and stays there. (Above λ = 2.375 the slope is 0 for good.)</p></div>
+<div class="demo" data-title="Watch the slope hit exactly zero" id="demo-l1">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>4. The "dead zone": soft thresholding</h2>
+<p>The one-feature rule generalises. Suppose plain regression would give a feature the weight <em>b</em>. Here is what each method does to it:</p>
+<ul>
+<li><strong>Ridge:</strong> shrinks it proportionally: <em>b ÷ (1 + λ)</em> in its simplest form. A small b stays small but non-zero.</li>
+<li><strong>LASSO:</strong> moves it towards zero by λ: <em>b − λ</em> if b is positive, <em>b + λ</em> if negative, and if |b| is smaller than λ the result is <strong>0</strong>. This is called <strong>soft thresholding</strong>.</li>
+</ul>
+<div class="demo" data-title="What each method does to a coefficient" id="demo-l2">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>See the flat stretch in the middle? Every coefficient inside the <strong>dead zone</strong> (from −λ to +λ) is set to exactly 0. Weak features fall inside it and vanish; strong features survive (a bit smaller). Raising λ widens the dead zone, so more features get eliminated.</p>
+
+<h2>5. Automatic feature selection</h2>
+<p>Here is a dataset with 8 features. Only x₁, x₂ and x₃ really affect y (true effects 3, −2 and 1.5); the other five are pure noise. The plot shows every coefficient as the strength λ increases (the <strong>LASSO path</strong>). As λ grows, features drop to zero one by one, weakest first.</p>
+<div class="demo" data-title="The LASSO path: features leave one at a time" id="demo-l3">
+  <div class="db" data-canvas></div>
+  <div class="db"><div class="tw"><table id="l3Tbl"></table></div></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Play with the slider. At a small λ LASSO keeps everything (like plain regression). At a moderate λ it should keep just the three real features and zero the noise; the "sweet spot" is what cross-validation finds for you. At a very large λ even the real features are removed (underfitting). Ridge with the same strength keeps all 8 alive (compare the last column).</p>
+
+<h2>6. The geometry: a diamond has corners</h2>
+<p>As with Ridge, we can view LASSO as "minimise the error, but stay inside a budget for the weights". With two weights, the Ridge budget was a <strong>circle</strong>. The LASSO budget |θ₁| + |θ₂| ≤ t is a <strong>diamond</strong>. The best answer is where the smallest error ellipse first touches the budget shape. A circle is smooth, so the touch point is usually somewhere along the curve. A diamond has <strong>sharp corners sitting exactly on the axes</strong>, and ellipses tend to hit a corner first. At a corner, one of the weights is exactly zero.</p>
+<div class="demo" data-title="Error contours vs. the L1 diamond" id="demo-l4">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>7. LASSO in scikit-learn</h2>
+<pre class="code">
+from sklearn.linear_model import Lasso
+
+X = [[1], [2], [3], [4]]
+y = [2, 4, 5, 8]
+
+model = Lasso(alpha=1.0)      # alpha is lambda
+model.fit(X, y)
+
+print(model.coef_)            # [1.1]   plain regression gave 1.9
+print(model.intercept_)       # 2.0
+print(model.predict([[5]]))   # [7.5]
+
+print(Lasso(alpha=3).fit(X, y).coef_)   # [0.]  the weight is exactly zero
+</pre>
+<p>These match the λ = 1 and λ = 3 rows of our hand calculation. Now a realistic workflow: scale the features (the penalty must treat every feature fairly), let cross-validation choose alpha, then look at which coefficients survived:</p>
+<pre class="code">
+import numpy as np
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LassoCV
+
+# 100 features but only 5 really matter
+X, y = make_regression(n_samples=300, n_features=100, n_informative=5, noise=10, random_state=0)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+
+model = make_pipeline(StandardScaler(), LassoCV(cv=5, random_state=0))
+model.fit(X_train, y_train)
+
+lasso = model.named_steps["lassocv"]
+print("best alpha:", lasso.alpha_)
+print("features kept:", np.sum(lasso.coef_ != 0), "of", len(lasso.coef_))
+print("test R2:", model.score(X_test, y_test))
+selected = np.flatnonzero(lasso.coef_)      # column numbers of the surviving features
+</pre>
+<p>You should see that LASSO keeps only a small number of the 100 features (close to the 5 real ones, plus perhaps a few weak extras). The exact count depends on the random data.</p>
+<div class="tw"><table>
+<tr><th>Parameter</th><th>What it does</th></tr>
+<tr><td><code>alpha</code></td><td>Strength λ. 0 = plain regression; bigger = more zeros. Default 1.0 (usually needs tuning, and is often much smaller).</td></tr>
+<tr><td><code>max_iter</code></td><td>LASSO is solved step by step (coordinate descent). If you see a <code>ConvergenceWarning</code>, raise this or scale your features.</td></tr>
+<tr><td><code>LassoCV(cv=5)</code></td><td>Tries many alphas with cross-validation and keeps the best (<code>alpha_</code>).</td></tr>
+<tr><td><code>coef_</code></td><td>Weights. Zero means the feature was dropped.</td></tr>
+<tr><td><code>SelectFromModel(Lasso(...))</code></td><td>Use LASSO purely as a feature selector inside a pipeline, then feed the survivors to any other model.</td></tr>
+</table></div>
+
+<h2>8. Ridge, LASSO or Elastic Net?</h2>
+<div class="tw"><table>
+<tr><th></th><th>Ridge (L2)</th><th>LASSO (L1)</th><th>Elastic Net (L1 + L2)</th></tr>
+<tr><td>Zeros out coefficients</td><td>No</td><td><b>Yes</b></td><td>Yes</td></tr>
+<tr><td>Feature selection</td><td>No</td><td><b>Yes</b></td><td>Yes</td></tr>
+<tr><td>Many small useful effects</td><td><b>Great</b></td><td>Tends to drop some</td><td>Good</td></tr>
+<tr><td>Groups of correlated features</td><td>Shares credit evenly</td><td>Picks one, drops the rest (and the pick can change between samples)</td><td>Keeps groups together</td></tr>
+<tr><td>More features than samples</td><td>Works</td><td>Keeps at most n features</td><td>Works</td></tr>
+<tr><td>scikit-learn</td><td><code>Ridge</code></td><td><code>Lasso</code></td><td><code>ElasticNet(alpha, l1_ratio)</code></td></tr>
+</table></div>
+<p><strong>Rule of thumb.</strong> Suspect that only a few features matter and you want a simple, explainable model → <strong>LASSO</strong>. Believe that many features each contribute a little, or features are highly correlated → <strong>Ridge</strong>. Not sure, or correlated groups plus a wish for sparsity → <strong>Elastic Net</strong> (the <code>l1_ratio</code> parameter is the mix: 1 = pure LASSO, 0 = pure Ridge). Try all three and compare with cross-validation.</p>
+<div class="callout warn"><p><strong>Always scale first.</strong> The penalty is applied to the weights, and a weight's size depends on the units of its feature. Without scaling, features measured in large units get an unfair advantage. Also remember that LASSO's "selection" is a statement about <em>this dataset</em>: with correlated features, which one survives can be somewhat arbitrary, so don't over-interpret a zero as "this feature is unimportant in the real world".</p></div>
+
+<h2>9. LASSO in the real world</h2>
+<div class="cards">
+<div class="card"><h4>🧬 Genetics</h4><p>Tens of thousands of gene measurements, a few hundred patients. LASSO shortlists the handful of genes linked to a disease.</p></div>
+<div class="card"><h4>🏦 Credit scoring</h4><p>Dozens of possible applicant attributes; regulators want a short, explainable model. LASSO keeps only the ones that matter.</p></div>
+<div class="card"><h4>📝 Text models</h4><p>Bag-of-words features can number in the hundreds of thousands. L1-regularised models keep a small vocabulary of the most predictive words.</p></div>
+<div class="card"><h4>🏭 Sensor selection</h4><p>Which of 300 factory sensors actually predict machine failure? Removing the rest saves money and simplifies the model.</p></div>
+<div class="card"><h4>📣 Marketing channels</h4><p>Out of 25 possible ad channels, LASSO points to the few that genuinely drive sales, so budget can move from the rest.</p></div>
+<div class="card"><h4>🩺 Clinical risk scores</h4><p>Doctors need a score based on a small number of measurements they can collect quickly. LASSO builds it.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>LASSO = linear regression + <strong>L1 penalty</strong> (λ × sum of |weights|).</li>
+<li>Unlike Ridge, it sets some weights <strong>exactly to zero</strong>, so it does <strong>feature selection</strong> automatically.</li>
+<li>One-feature rule: slope = (S<sub>xy</sub> − n·λ) ÷ S<sub>xx</sub>, and it becomes 0 when n·λ is bigger than S<sub>xy</sub>.</li>
+<li>Geometry: the L1 "diamond" has corners on the axes, which is where zeros come from.</li>
+<li>Scale first, choose λ (<code>alpha</code>) with cross-validation (<code>LassoCV</code>); use Elastic Net when features are correlated in groups.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (15 minutes, optional).</strong></p>
+<ol>
+<li>By hand, for the data (1, 2), (2, 4), (3, 5), (4, 8) compute the LASSO slope and intercept for λ = 0.25 and for λ = 2.5. (Remember pull = 4 × λ, and S<sub>xy</sub> = 9.5, S<sub>xx</sub> = 5.)</li>
+<li>Confirm both with <code>Lasso(alpha=...)</code> in scikit-learn.</li>
+<li>Bonus: on <code>make_regression(n_samples=200, n_features=30, n_informative=4, noise=5)</code> fit <code>LassoCV</code> after scaling and count the non-zero coefficients. Then fit <code>RidgeCV</code> and count the non-zero ones. What do you notice?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> λ = 0.25: pull = 1, slope = (9.5 − 1) ÷ 5 = 1.70, intercept = 4.75 − 1.7 × 2.5 = 0.50. λ = 2.5: pull = 10, which is more than 9.5, so slope = 0 and intercept = 4.75.</p>
+<p><b>2.</b> <code>Lasso(alpha=0.25)</code> → coef 1.7, intercept 0.5; <code>Lasso(alpha=2.5)</code> → coef 0.0, intercept 4.75.</p>
+<p><b>3.</b> LASSO keeps only a handful of the 30 coefficients non-zero (roughly the informative ones), while Ridge keeps all 30 non-zero (many tiny). That is the practical difference between the two.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/lasso.js"></script>
+</body>
+</html>

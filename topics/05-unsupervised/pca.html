@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCA · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="pca">
+<article id="lesson">
+
+<h1>Principal Component Analysis (PCA)</h1>
+<p class="lede">Real datasets often have dozens or hundreds of columns, but many of them move together and repeat the same information. PCA finds a few <em>new</em> columns, each a blend of the old ones, that capture as much of the variation in the data as possible. You keep the few most informative ones and drop the rest.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 90 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: the best angle to look from</h2>
+<div class="callout analogy"><p><strong>Photographing a sculpture.</strong> A statue is three-dimensional, but a photo is flat. Some camera angles are terrible: from directly behind, or edge-on, you lose most of the shape. From the best angle, you see nearly everything in a single flat picture. PCA is a way of finding that best angle for data: given points in many dimensions, it finds the flat view (2-D, or 3-D, or whatever you ask for) that <strong>keeps as much of the spread of the data as possible</strong>.</p></div>
+<p>Why would you want fewer columns?</p>
+<ul>
+<li><strong>Seeing the data.</strong> You cannot plot 30 dimensions, but you can plot 2.</li>
+<li><strong>Removing redundancy.</strong> If height in centimetres and height in inches are both columns, one is enough. Real data has softer versions of the same thing (income and spending, petal length and petal width).</li>
+<li><strong>Removing noise.</strong> The directions with tiny variation are often mostly noise; dropping them cleans the data.</li>
+<li><strong>Speed and stability.</strong> Fewer columns make later models faster and, in some cases, less prone to overfitting. Correlated columns can also make linear models unstable (multicollinearity); PCA's new columns are uncorrelated.</li>
+</ul>
+<p>PCA is <strong>unsupervised</strong>: it never looks at labels, only at how the columns vary together.</p>
+
+<h2>2. What PCA actually does</h2>
+<p>PCA invents a new set of axes, called <strong>principal components</strong>:</p>
+<ul>
+<li><strong>PC1</strong> is the direction along which the data is <em>most spread out</em>.</li>
+<li><strong>PC2</strong> is the direction, at a right angle to PC1, with the most spread that is left. PC3 is at right angles to both, and so on.</li>
+<li>Each component is a <em>weighted blend</em> of the original columns (for example, "0.7 × height + 0.7 × weight").</li>
+<li>The components come out in order of importance: PC1 has the most variance, and each later one has less.</li>
+</ul>
+<p>To reduce dimensions, keep the first k components and describe every point by its k <strong>scores</strong> (its coordinates along those axes). Here is the key picture: a line through the data cloud. Rotate the line, and see two things change at once.</p>
+<div class="demo" data-title="Find the axis that keeps the most spread" id="demo-axis">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Each point is dropped onto the line (the red segments). The blue curve, the <em>spread of the shadow along the line</em>, peaks at one angle. The red curve, the <em>information lost</em> (the squared lengths of the red segments), is at its lowest at the very same angle, because the two always add up to the same total. So <strong>"keep the most variance" and "lose the least information" are the same goal</strong>. The angle at the peak is PC1.</p>
+
+<h2>3. The recipe, with the maths in plain words</h2>
+<ol>
+<li><strong>Centre</strong> the data: subtract each column's average, so the cloud is centred on the origin. (If the columns have different units, also divide by each column's standard deviation: <em>standardise</em>. See section 6.)</li>
+<li><strong>Measure how the columns vary together</strong> with the <strong>covariance matrix</strong>: variances of each column on the diagonal, and covariances (how much two columns move together) off the diagonal.</li>
+<li><strong>Find its eigenvectors and eigenvalues.</strong> In words: the covariance matrix describes an ellipse-shaped cloud. The <em>eigenvectors</em> are the ellipse's axes (long axis, short axis, ...): these are the principal components. Each <em>eigenvalue</em> is the variance of the data along its axis.</li>
+<li><strong>Sort</strong> the components by eigenvalue, largest first.</li>
+<li><strong>Project:</strong> a point's score on a component is the dot product of the (centred) point with that eigenvector. Keep the first k scores.</li>
+</ol>
+<div class="callout tip"><p><strong>How much did we keep?</strong> The <strong>explained variance ratio</strong> of a component is its eigenvalue divided by the sum of all the eigenvalues. Adding the first k ratios tells you what fraction of the total variation the k-dimensional summary retains.</p></div>
+
+<h3>By hand: five points in 2-D</h3>
+<div class="tw"><table>
+<tr><th>Point</th><td>a</td><td>b</td><td>c</td><td>d</td><td>e</td></tr>
+<tr><th>x</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td></tr>
+<tr><th>y</th><td class="num">1</td><td class="num">3</td><td class="num">2</td><td class="num">5</td><td class="num">4</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>1. Centre.</strong> Mean of x = 3, mean of y = 3. Centred points (dx, dy): a (−2, −2), b (−1, 0), c (0, −1), d (1, 2), e (2, 1).</p>
+<p><strong>2. Covariance matrix</strong> (we divide sums by n − 1 = 4):
+<br>variance of x = (4 + 1 + 0 + 1 + 4) ÷ 4 = <b>2.5</b>; variance of y = (4 + 0 + 1 + 4 + 1) ÷ 4 = <b>2.5</b>; covariance = (dx·dy summed) ÷ 4 = (4 + 0 + 0 + 2 + 2) ÷ 4 = <b>2</b>.
+<br>So the matrix is [[2.5, 2], [2, 2.5]]: x and y both have spread 2.5 and move together strongly.</p>
+<p><strong>3. Eigenvalues.</strong> For a 2×2 matrix of the form [[a, b], [b, a]] the eigenvalues are simply <b>a + b</b> and <b>a − b</b> (because the two mixed directions (1, 1) and (1, −1) are its axes): <b>λ₁ = 2.5 + 2 = 4.5</b> and <b>λ₂ = 2.5 − 2 = 0.5</b>. The eigenvectors (each scaled to length 1): <b>PC1 = (0.707, 0.707)</b>, the diagonal direction; <b>PC2 = (−0.707, 0.707)</b>, the perpendicular direction. (The sign of an eigenvector is arbitrary: (−0.707, −0.707) describes the same axis.)</p>
+<p><strong>4. Explained variance.</strong> Total = 4.5 + 0.5 = 5 (equal to the sum of the two original variances, 2.5 + 2.5: nothing is created or lost, only redistributed). PC1 explains 4.5 ÷ 5 = <b>90%</b>, PC2 explains <b>10%</b>.</p>
+<p><strong>5. Scores.</strong> Score on PC1 = 0.707 × dx + 0.707 × dy; on PC2 = −0.707 × dx + 0.707 × dy:</p>
+<div class="tw"><table>
+<tr><th>Point</th><th class="num">PC1 score</th><th class="num">PC2 score</th></tr>
+<tr><td>a</td><td class="num">−2.83</td><td class="num">0</td></tr>
+<tr><td>b</td><td class="num">−0.71</td><td class="num">+0.71</td></tr>
+<tr><td>c</td><td class="num">−0.71</td><td class="num">−0.71</td></tr>
+<tr><td>d</td><td class="num">+2.12</td><td class="num">+0.71</td></tr>
+<tr><td>e</td><td class="num">+2.12</td><td class="num">−0.71</td></tr>
+</table></div>
+<p><b>Check:</b> the variance of the PC1 scores = (8 + 0.5 + 0.5 + 4.5 + 4.5) ÷ 4 = 18 ÷ 4 = <b>4.5</b>, exactly λ₁. The variance of the PC2 scores = (0 + 0.5 + 0.5 + 0.5 + 0.5) ÷ 4 = <b>0.5</b> = λ₂. And the scores are uncorrelated.</p>
+<p><strong>6. Keep only PC1 (2-D → 1-D).</strong> Each point is described by one number. To see what we lost, rebuild the points from their PC1 score: mean + score × PC1 = (3, 3) + score × (0.707, 0.707). Point a: score −2.83 → (1, 1). Point b: −0.71 → (2.5, 2.5). Point c → (2.5, 2.5). Point d: 2.12 → (4.5, 4.5); e → (4.5, 4.5). The rebuilt points all lie on the line y = x. The information lost is the sum of squared PC2 scores = 0 + 0.5 + 0.5 + 0.5 + 0.5 = <b>2.0</b>, which is 10% of the total squared spread (4 × 5 = 20), matching the 10% left unexplained.</p></div>
+<p>So one number per point instead of two, and 90% of the variation remains. Now the same idea in 3-D: the points below form a tilted "pancake". From most angles it looks like a messy blob; from the right angle it is a clean flat sheet.</p>
+<div class="demo" data-title="A pancake in 3-D and its best 2-D view" id="demo-3d">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The three coloured lines are the principal axes (their lengths are proportional to the spread along them). The button rotates the view so that PC1 is horizontal and PC2 vertical: the "best photograph". It keeps more variance than any view you can find by hand (try!).</p>
+
+<h2>4. How many components to keep?</h2>
+<p>Look at the explained variance ratios, drawn as a <strong>scree plot</strong> (bars) with the running total (line). Common rules:</p>
+<ul>
+<li>Keep enough components to reach a target of cumulative variance, often <b>90 to 95%</b> (in scikit-learn: <code>PCA(n_components=0.95)</code>).</li>
+<li>Look for the <b>elbow</b>, where the bars stop dropping steeply and flatten out.</li>
+<li>Or choose by what works: try k = 2, 5, 10 ... inside a cross-validated pipeline and pick the smallest k that keeps the model's accuracy.</li>
+<li>For visualisation, simply take 2 (or 3), and report how much variance they represent.</li>
+</ul>
+<div class="demo" data-title="Scree plots on real data" id="demo-scree">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>For the iris flowers (4 features), the first two components explain <b>97.8%</b> of the variance (92.5% + 5.3%): two numbers per flower are almost as good as four, and the three species are clearly visible. The wine data has 13 features; standardised, PC1 explains 36.2% and the first two 55.4%, so a 2-D picture keeps only about half the variation (5 components for 80%, 10 for 95%). PCA compresses well when the columns are strongly related and less well when they are not.</p>
+
+<h2>5. Reading the components: loadings</h2>
+<p>Each component is a list of weights, one per original column, called its <strong>loadings</strong>. A large weight (positive or negative) means that column matters for that component. For iris (in centimetres, unscaled) PC1 = (0.36, −0.09, <b>0.86</b>, 0.36) on (sepal length, sepal width, petal length, petal width): PC1 is essentially "overall flower size, dominated by petal length". PC2 = (0.66, <b>0.73</b>, −0.17, −0.08) mostly contrasts the sepal measurements. That is what makes PCA interpretable when it works, but components are often <em>mixtures</em> with no clean name. Signs are arbitrary: flipping a whole component changes nothing.</p>
+
+<h2>6. The scaling trap</h2>
+<div class="callout warn"><p><strong>PCA follows variance, and variance depends on units.</strong> A column measured in the thousands has a huge variance, so it dominates PC1 regardless of whether it is important. On the wine data (13 chemical measurements), <em>without scaling</em> PC1 explains <b>99.8%</b> of the variance, and its loading on the column "proline" is 1.00 (all other weights are almost 0): proline is simply measured in the hundreds and thousands, while the other columns are mostly between 0 and about 30 (magnesium reaches about 160, still far smaller). After standardising every column (mean 0, standard deviation 1), PC1 explains 36.2% and blends many measurements. <strong>Standardise your features first</strong> unless they are all in the same units and you want the units' natural scale to count (as with iris, where all four are centimetres and scaling changes little).</p></div>
+<p>Another good habit: <strong>fit PCA on the training data only</strong> and then apply it to the test data, exactly as with scalers. Put the scaler and PCA inside a <code>Pipeline</code> so this happens automatically inside cross-validation.</p>
+
+<h2>7. PCA in scikit-learn</h2>
+<p>Our five points reproduce the hand calculation:</p>
+<pre class="code">
+import numpy as np
+from sklearn.decomposition import PCA
+
+X = np.array([[1, 1], [2, 3], [3, 2], [4, 5], [5, 4]], dtype=float)
+
+pca = PCA(n_components=2).fit(X)
+print(pca.mean_)                        # [3. 3.]
+print(pca.components_)                  # [[ 0.7071  0.7071] [-0.7071  0.7071]]   -> PC1, PC2
+print(pca.explained_variance_)          # [4.5 0.5]      -> the eigenvalues
+print(pca.explained_variance_ratio_)    # [0.9 0.1]
+print(pca.transform(X).round(2))        # the scores:  [[-2.83  0.] [-0.71  0.71] [-0.71 -0.71] [ 2.12  0.71] [ 2.12 -0.71]]
+
+pca1 = PCA(n_components=1).fit(X)
+X_back = pca1.inverse_transform(pca1.transform(X))
+print(X_back)                           # [[1. 1.] [2.5 2.5] [2.5 2.5] [4.5 4.5] [4.5 4.5]]   -> our reconstruction
+print(((X - X_back) ** 2).sum())        # 2.0
+</pre>
+<p>Iris and wine (the outputs are from an actual run with scikit-learn 1.9.0; other versions may differ slightly):</p>
+<pre class="code">
+from sklearn.datasets import load_iris, load_wine
+from sklearn.preprocessing import StandardScaler
+
+Xi, yi = load_iris(return_X_y=True)
+print(PCA().fit(Xi).explained_variance_ratio_.round(4))                             # [0.9246 0.0531 0.0171 0.0052]
+print(PCA().fit(StandardScaler().fit_transform(Xi)).explained_variance_ratio_.round(4))   # [0.7296 0.2285 0.0367 0.0052]
+
+Xw, yw = load_wine(return_X_y=True)
+print(PCA().fit(Xw).explained_variance_ratio_[:2])                                  # [0.9981 0.0017]   -> dominated by proline!
+ratios = PCA().fit(StandardScaler().fit_transform(Xw)).explained_variance_ratio_
+print(ratios[:3].round(3), ratios.cumsum()[[1, 4, 9]].round(3))                     # [0.362 0.192 0.111]  [0.554 0.802 0.962]
+</pre>
+<p>A more realistic use: 8×8-pixel images of handwritten digits (64 features). How many components keep 95% of the variance, and how well does a classifier do on the compressed data?</p>
+<pre class="code">
+from sklearn.datasets import load_digits
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
+
+Xd, yd = load_digits(return_X_y=True)
+print(PCA(n_components=0.95).fit(Xd).n_components_)     # 29   (64 features -> 29 keep 95% of the variance; 13 keep 80%, 21 keep 90%, 41 keep 99%)
+
+for k in (2, 5, 10, 20, 30):
+    pipe = make_pipeline(PCA(n_components=k), KNeighborsClassifier())    # PCA is re-fitted inside every CV fold
+    print(k, cross_val_score(pipe, Xd, yd, cv=5).mean().round(4))
+# 2 0.5949 | 5 0.8837 | 10 0.9405 | 20 0.9583 | 30 0.9616
+print(cross_val_score(KNeighborsClassifier(), Xd, yd, cv=5).mean().round(4))   # 0.9627   with all 64 pixels
+</pre>
+<p>Twenty components (less than a third of the columns) give 95.8% accuracy versus 96.3% for all 64 pixels; two components (28.5% of the variance) give only 59.5%, enough for a picture but not for recognising digits. I also tried denoising: after adding random noise to every pixel, keeping the components that explain 80% of the variance (37 of them) cut the average squared error against the clean images from 15.9 to 10.4. That is a real but moderate improvement, not magic.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>n_components</code></td><td>An integer (how many to keep), a fraction between 0 and 1 (keep enough for that share of the variance), or <code>"mle"</code> (a statistical guess).</td></tr>
+<tr><td><code>components_</code></td><td>The principal axes: one row per component, one column per original feature (the loadings).</td></tr>
+<tr><td><code>explained_variance_</code>, <code>explained_variance_ratio_</code></td><td>Eigenvalues, and the fraction of the total variance each carries.</td></tr>
+<tr><td><code>mean_</code>, <code>n_components_</code></td><td>The column means that were subtracted, and how many components were kept.</td></tr>
+<tr><td><code>transform</code>, <code>inverse_transform</code></td><td>Project data onto the components; rebuild approximate original data from the scores.</td></tr>
+<tr><td><code>whiten=True</code></td><td>Rescales every component to variance 1 (useful before some models).</td></tr>
+<tr><td><code>svd_solver</code></td><td><code>"auto"</code> normally; <code>"randomized"</code> is faster for big data. (Internally scikit-learn uses the singular value decomposition, an equivalent way to get the same components.)</td></tr>
+<tr><td><code>IncrementalPCA</code>, <code>TruncatedSVD</code>, <code>KernelPCA</code></td><td>Variants: for data that does not fit in memory, for sparse matrices (such as text), and for curved (non-linear) structure.</td></tr>
+</table></div>
+
+<h2>8. Limits, alternatives and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Simple, fast, deterministic, and works on any numeric table</td><td><b>Linear only</b>: it cannot unroll a curved surface (a spiral, a Swiss roll)</td></tr>
+<tr><td>Uncorrelated new columns; controllable information loss</td><td>Big variance is not the same as usefulness: a low-variance direction can be the one that separates the classes (see LDA, next)</td></tr>
+<tr><td>Great for plotting, compression and denoising</td><td>Sensitive to scaling and outliers; components can be hard to interpret</td></tr>
+<tr><td>Can be reversed approximately (<code>inverse_transform</code>)</td><td>New columns are blends of all old ones, so you lose the original meaning of each column</td></tr>
+</table></div>
+<p><strong>Alternatives:</strong> <em>LDA</em> (next lesson) finds directions that separate known classes, using the labels. <em>t-SNE</em> and <em>UMAP</em> make good 2-D pictures of non-linear structure but are for visualisation only, and their distances are not to be trusted. <em>Autoencoders</em> (neural networks) can compress non-linearly. <em>Feature selection</em> keeps a subset of the original columns unchanged, which keeps meaning but not blended information.</p>
+<div class="cards">
+<div class="card"><h4>📊 Visualising big data</h4><p>Project 30 to 1000 features onto PC1 × PC2 to see clusters, outliers and batches in one plot.</p></div>
+<div class="card"><h4>🧬 Genetics</h4><p>PCA of genetic variation across thousands of markers famously reproduces the geographic map of a population.</p></div>
+<div class="card"><h4>🖼️ Image compression and eigenfaces</h4><p>Faces or digits described by a few dozen components instead of thousands of pixels.</p></div>
+<div class="card"><h4>📈 Finance</h4><p>Hundreds of correlated stock or bond series are driven by a handful of factors (the market, interest rates ...) that PCA extracts.</p></div>
+<div class="card"><h4>⚙️ Preprocessing</h4><p>Decorrelate and shrink the inputs before KNN, clustering, or regression to speed up and stabilise them.</p></div>
+<div class="card"><h4>🎧 Noise reduction</h4><p>Sensor and signal data: keep the components with real signal and drop the ones that are mostly noise.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>PCA finds new perpendicular axes (<strong>principal components</strong>) ordered by how much variance they capture; you keep the first k and drop the rest.</li>
+<li>Recipe: <strong>centre</strong> (and usually <strong>standardise</strong>) → covariance matrix → <strong>eigenvectors</strong> (the axes) and <strong>eigenvalues</strong> (variance along each) → <strong>project</strong>.</li>
+<li>Maximising the variance kept and minimising the squared error lost are the same thing. In our example: eigenvalues 4.5 and 0.5, so PC1 keeps 90%, and the reconstruction error from dropping PC2 is 2.0.</li>
+<li>Choose k with the <strong>explained variance ratio</strong> (for example 95%), the scree elbow, or cross-validation. Digits: 29 of 64 components keep 95% of the variance.</li>
+<li><strong>Scale first</strong>: unscaled wine has PC1 = 99.8% just because proline is measured in the thousands.</li>
+<li>Linear, unsupervised, and blind to class labels: high variance does not always mean useful for prediction. Fit it inside a pipeline, on the training data only.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A covariance matrix is [[3, 1], [1, 3]]. What are its eigenvalues, the direction of PC1, and the share of variance explained by PC1?</li>
+<li>You standardise a dataset with 10 columns, so the total variance is 10. PC1 has eigenvalue 4. What fraction does it explain?</li>
+<li>The cumulative explained variance is 0.55, 0.75, 0.87, 0.95, 0.99, 1.00. How many components for at least 95%?</li>
+<li>In the five-point example, a new point (6, 6) arrives. What are its PC1 and PC2 scores? Where does it land when rebuilt from PC1 alone?</li>
+<li>Bonus: run the wine code with and without <code>StandardScaler</code>. How many components does it take to reach 80% of the variance in each case?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> For [[a, b], [b, a]] the eigenvalues are a + b and a − b: <b>4 and 2</b>. PC1 is the diagonal direction <b>(0.707, 0.707)</b>. Its share is 4 ÷ (4 + 2) = <b>66.7%</b>.</p>
+<p><b>2.</b> 4 ÷ 10 = <b>40%</b>.</p>
+<p><b>3.</b> <b>4 components</b> (the fourth is the first to reach 0.95).</p>
+<p><b>4.</b> Centred: (6 − 3, 6 − 3) = (3, 3). PC1 score = 0.707 × 3 + 0.707 × 3 = <b>4.24</b>. PC2 score (using PC2 = (−0.707, 0.707)) = −0.707 × 3 + 0.707 × 3 = <b>0</b>. Rebuilt from PC1 alone: (3, 3) + 4.24 × (0.707, 0.707) = <b>(6, 6)</b>, exactly where it started: the point lies on the PC1 line, so nothing is lost.</p>
+<p><b>5.</b> Unscaled, one component already exceeds 80% (it holds 99.8%). Standardised, it takes <b>5 components</b> to reach 80.2% (cumulative 0.362, 0.554, 0.665, 0.736, 0.802).</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/pca-data.js"></script>
+<script src="../../js/pages/pca.js"></script>
+</body>
+</html>

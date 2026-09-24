@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Pre-processing · ML, Visually</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-topic="preprocessing">
+<article id="lesson">
+
+<h1>Data Pre-processing</h1>
+<p class="lede">Data pre-processing is the process of preparing raw data for a machine learning model by cleaning it, encoding categorical variables and applying feature scaling, to make the data suitable for training.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 75 min</span><span class="chip plain">8 interactive demos</span></div>
+
+<h2>1. Why raw data can't go straight into a model</h2>
+<p>Machine learning models are mathematical machines. They add, multiply and measure distances, which means every input must be a <strong>clean number</strong>. Real data arrives with text such as <code>"Male"</code> or <code>"Pune"</code>, with blanks, and with columns on wildly different scales (age in tens, salary in tens of thousands). Pre-processing fixes all of that <em>before</em> the algorithm ever sees the data.</p>
+<div class="callout analogy"><p><strong>Cooking prep (mise en place).</strong> Before a chef cooks, ingredients are washed, peeled, chopped and measured. You do not throw a whole unpeeled onion, a bag of flour and a live chicken into the pot. Pre-processing is the peeling and chopping; the model is the cooking.</p></div>
+<p>The main jobs are:</p>
+<ul>
+<li><strong>Cleaning</strong>: handle missing values, duplicates and outliers (covered in the ML Workflow lesson).</li>
+<li><strong>Encoding</strong>: convert categorical or text data into numbers. Three techniques: <em>Label</em>, <em>One-Hot</em> and <em>Ordinal</em> encoding. (Sections 3–6.)</li>
+<li><strong>Feature scaling</strong>: bring numeric columns onto a comparable scale. (Section 7.)</li>
+</ul>
+<h3>Know your data types first</h3>
+<div class="tw"><table>
+<tr><th>Type</th><th>Meaning</th><th>Examples</th><th>What it needs</th></tr>
+<tr><td><strong>Numerical (continuous)</strong></td><td>Any value in a range</td><td>Height, price, temperature</td><td>Scaling</td></tr>
+<tr><td><strong>Numerical (discrete)</strong></td><td>Counts</td><td>Bedrooms, number of clicks</td><td>Usually scaling</td></tr>
+<tr><td><strong>Categorical (nominal)</strong></td><td>Labels with <em>no</em> order</td><td>Gender, city, colour, fruit</td><td>One-Hot (or Label for the target)</td></tr>
+<tr><td><strong>Categorical (ordinal)</strong></td><td>Labels with a <em>meaningful order</em></td><td>Low / Medium / High, S / M / L, grade A–F</td><td>Ordinal encoding</td></tr>
+<tr><td><strong>Text</strong></td><td>Free sentences</td><td>Reviews, tweets</td><td>Bag-of-words / TF-IDF (beyond this lesson)</td></tr>
+<tr><td><strong>Date / time</strong></td><td>Timestamps</td><td>Order date</td><td>Extract year, month, weekday</td></tr>
+</table></div>
+
+<h2>2. Encoding: turning categories into numbers</h2>
+<p><strong>Encoding</strong> is the process of converting categorical or text data into numerical values so that machine learning models can understand and use it. Our system does not understand characters; the machine has some assigned decimal value that it understands for every character. To make the model understand the data faster and in a proper manner, we go with encoding.</p>
+<p>Type any word to see the numbers your computer really stores for each character (the ASCII / Unicode code point):</p>
+<div class="demo" data-title="What the machine sees" id="demo-ascii">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="asciiTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<p>So <code>"Male"</code> is already numbers underneath, but numbers like 77, 97, 108, 101 have no <em>meaning</em> for a model. Encoding gives categories numbers that <em>do</em> mean something useful. In scikit-learn we generally use 3 types of encoders:</p>
+<div class="cards">
+<div class="card"><h4>Label Encoder</h4><p>Each category → an integer 0 … n−1. Best for the <b>target</b> column.</p><span class="tag">LabelEncoder</span></div>
+<div class="card"><h4>One-Hot Encoder</h4><p>Each category → its own 0/1 column. Best for <b>unordered</b> features.</p><span class="tag">OneHotEncoder</span></div>
+<div class="card"><h4>Ordinal Encoder</h4><p>Categories → integers in an order <b>you</b> define. Best for <b>ranked</b> features.</p><span class="tag">OrdinalEncoder</span></div>
+</div>
+
+<h2>3. Label Encoder</h2>
+<p><strong>Label Encoder</strong> is a technique where the categories are mapped from <code>0</code> to <code>n−1</code>, based on the sorted (alphabetical / ASCII) order of the category names. Each and every unique category is mapped to one integer.</p>
+<p><strong>Example.</strong> A Gender column contains <code>Male, Female, Female, Male</code>. The unique categories are Female and Male. Alphabetically <em>F</em> (code 70) comes before <em>M</em> (code 77), so Female → 0 and Male → 1. The column becomes <code>1, 0, 0, 1</code>.</p>
+<div class="demo" data-title="Label-encode your own column" id="demo-label">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="labelTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>How the order is decided.</strong> Strings are compared character by character using their codes. The <em>first</em> character decides; if the first characters match, the second decides, and so on. That's why <code>Patna</code> comes before <code>Pune</code> (both start with P, but <code>a</code> = 97 is less than <code>u</code> = 117). Also, capital letters (65–90) all sort <em>before</em> lower-case ones (97–122), so <code>"Zebra"</code> sorts before <code>"apple"</code>. Try the "Tie-break" preset above.</p></div>
+<h3>The syntax</h3>
+<pre class="code">
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+
+df = pd.DataFrame({"ex": ["A", "B", "C", "A"]})
+
+obj = LabelEncoder()                     # 1. create the encoder object
+df["ex"] = obj.fit_transform(df["ex"])   # 2. learn the mapping AND apply it
+print(df["ex"].tolist())                 # [0, 1, 2, 0]
+
+print(obj.classes_)                      # ['A' 'B' 'C']   position = code
+print(obj.inverse_transform([2, 0]))     # ['C' 'A']       numbers back to labels
+</pre>
+<h3>What does <code>fit_transform()</code> actually do?</h3>
+<p>It is a method that does <strong>two things at once</strong>:</p>
+<ol class="steps">
+<li><strong><code>fit()</code></strong>: <em>learns</em> the mapping from the unique labels to numbers (it finds the unique categories, sorts them and remembers them in <code>classes_</code>).</li>
+<li><strong><code>transform()</code></strong>: <em>converts</em> the original labels into those numbers.</li>
+</ol>
+<p>They can be called separately: <code>obj.fit(train)</code> once, then <code>obj.transform(new_data)</code> whenever new data arrives, using the <em>same</em> mapping. Always do it this way for new or test data; never re-fit on it.</p>
+
+<h3>The big drawback of Label Encoding</h3>
+<p>Label encoding converts <em>unordered</em> categories into a numeric sequence, which may mislead the ML algorithm into thinking the categories have a ranked order or scale (0 &lt; 1 &lt; 2). Algorithms that rely on <strong>calculating mathematical distances between data points</strong> (KNN, K-means, SVM, linear models) treat the numbers as real intervals. Try it:</p>
+<div class="demo" data-title="Distances between cities: Label vs One-Hot" id="demo-dist">
+  <div class="controls" data-controls></div>
+  <div class="db" data-canvas></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p>Cities label-encoded: Delhi = 0, Mumbai = 1, Pune = 2.
+<br><strong>Label distance</strong> Delhi↔Pune = |0 − 2| = <strong>2</strong>, but Delhi↔Mumbai = |0 − 1| = <strong>1</strong>. So the model believes Delhi is "closer" to Mumbai than to Pune, and that Pune is "twice as far", a ranking that does not exist in reality.
+<br><strong>One-hot distance</strong> Delhi = (1,0,0), Mumbai = (0,1,0), Pune = (0,0,1). Distance = \(\sqrt{(1-0)^2+(0-1)^2+(0-0)^2}=\sqrt2\approx1.414\) for <em>every</em> pair: all cities are equally different, which is the truth.</p></div>
+<div class="callout real"><p><strong>Where Label Encoding is used in practice.</strong> Mainly for the <em>target</em> column <code>y</code> in classification: turning "setosa / versicolor / virginica" into 0/1/2. There an order doesn't matter because the model predicts a class, not a distance. Tree-based models (Decision Tree, Random Forest, XGBoost) can also tolerate label-encoded features. scikit-learn itself says <code>LabelEncoder</code> is meant for <code>y</code>; for input columns use <code>OrdinalEncoder</code> or <code>OneHotEncoder</code>.</p></div>
+
+<h2>4. One-Hot Encoder</h2>
+<p><strong>One-Hot Encoding</strong> represents each category in a feature as a <strong>binary vector</strong>. Every unique category gets its <em>own column</em>; the column for the row's category is marked <code>1</code>, and all the others are <code>0</code>. Each unique category is mapped individually, so no fake ranking appears.</p>
+<p><strong>Example.</strong> A <code>fruits</code> column holding Apple, Orange, Grapes, Apple becomes three columns: <code>fruits_Apple</code>, <code>fruits_Grapes</code>, <code>fruits_Orange</code>. The new column names are the original column name plus the category name; if the category is present the cell is 1, otherwise 0.</p>
+<div class="demo" data-title="One-hot encode a column" id="demo-ohe">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="oheTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>The syntax</h3>
+<pre class="code">
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+
+df = pd.DataFrame({"fruits": ["Apple", "Orange", "Grapes", "Apple"]})
+
+obj = OneHotEncoder(sparse_output=False)           # dense 0/1 array (not a sparse matrix)
+data = obj.fit_transform(df[["fruits"]])           # NOTE the double brackets: 2-D input
+names = obj.get_feature_names_out()                # ['fruits_Apple' 'fruits_Grapes' 'fruits_Orange']
+
+encoded = pd.DataFrame(data, columns=names)
+df = pd.concat([df, encoded], axis=1)              # glue the new columns onto the table
+print(df)
+</pre>
+<pre class="out">   fruits  fruits_Apple  fruits_Grapes  fruits_Orange
+0   Apple           1.0            0.0            0.0
+1  Orange           0.0            0.0            1.0
+2  Grapes           0.0            1.0            0.0
+3   Apple           1.0            0.0            0.0</pre>
+<div class="tw"><table>
+<tr><th>Piece</th><th>What it does</th></tr>
+<tr><td><code>sparse_output=False</code></td><td>By default OneHotEncoder returns a <em>sparse matrix</em> (only stores the 1s, efficient for thousands of categories). <code>False</code> gives a normal 2-D array of 1s and 0s you can put straight into a DataFrame. (In scikit-learn older than 1.2 the argument is called <code>sparse=False</code>.)</td></tr>
+<tr><td><code>fit_transform(df[["fruits"]])</code></td><td><code>fit</code> finds the unique categories; <code>transform</code> builds the 0/1 array. Encoders expect a 2-D table, hence the double brackets <code>[[ ]]</code>.</td></tr>
+<tr><td><code>get_feature_names_out()</code></td><td>Finds out the names of the columns created by encoding: the main column name + <code>_</code> + category.</td></tr>
+<tr><td><code>pd.concat([...], axis=1)</code></td><td>Joins the encoded columns to the original DataFrame side by side (<code>axis=1</code> = columns).</td></tr>
+<tr><td>Number of columns</td><td>= number of unique categories. Compare: Label Encoder needs just 1 column.</td></tr>
+</table></div>
+<h3>Useful options</h3>
+<pre class="code">
+OneHotEncoder(drop="first")                 # drop one column to avoid the "dummy variable trap"
+OneHotEncoder(handle_unknown="ignore")      # unseen category at prediction time -> all zeros, no crash
+OneHotEncoder(min_frequency=10)             # group rare categories together (sklearn >= 1.1)
+
+pd.get_dummies(df["fruits"], prefix="fruits")   # the same idea in one line of pandas
+</pre>
+<div class="callout warn"><p><strong>The dummy-variable trap.</strong> With 3 fruit columns, if <em>Apple = 0</em> and <em>Grapes = 0</em> then <em>Orange</em> must be 1. The last column is completely predictable from the others (perfect multicollinearity). Plain Linear/Logistic Regression can become unstable because of this, so use <code>drop="first"</code>. Trees, KNN and regularised models don't mind. <strong>High cardinality:</strong> a column with 10,000 zip codes would create 10,000 columns. Use frequency/target encoding or group the rare ones instead.</p></div>
+<div class="callout real"><p><strong>Real-world:</strong> Titanic survival (Sex, Embarked port); predicting house prices from <em>city</em> or <em>neighbourhood</em>; e-commerce (product category, device type, payment method); loan approval (employment type). One-hot is the default choice for nominal features in linear models, SVMs, KNN and neural networks.</p></div>
+
+<h2>5. Ordinal Encoder</h2>
+<p><strong>Ordinal Encoding</strong> converts categorical values into numerical values based on an <strong>order defined by the user</strong>. It is used when the categories have a meaning or ranking, and the user decides what that ranking should be. <em>You</em> tell it the order with the <code>categories</code> parameter.</p>
+<p>Example: salary levels <code>low &lt; medium &lt; high</code> → 0, 1, 2. Here the distance genuinely means something (high is further from low than medium is), so a single numeric column is the right representation.</p>
+<div class="demo" data-title="Define the order yourself" id="demo-ord">
+  <div class="controls" data-controls></div>
+  <div class="db"><div id="ordOrder" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"></div></div>
+  <div class="db"><div class="tw"><table id="ordTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>The syntax</h3>
+<pre class="code">
+import pandas as pd
+from sklearn.preprocessing import OrdinalEncoder
+
+df = pd.DataFrame({"salary": ["high", "low", "medium", "low", "high"]})
+
+# manually define categories using the `categories` parameter (a list of lists, one per column)
+obj = OrdinalEncoder(categories=[["low", "medium", "high"]])
+df["sal"] = obj.fit_transform(df[["salary"]])
+print(df)
+</pre>
+<pre class="out">   salary  sal
+0    high  2.0
+1     low  0.0
+2  medium  1.0
+3     low  0.0
+4    high  2.0</pre>
+<p>Without <code>categories</code>, scikit-learn would sort alphabetically (<code>high &lt; low &lt; medium</code>) and give the wrong ranking, so <strong>always pass the order</strong> for ranked data. The output is a float column (0.0, 1.0, 2.0). Other options: <code>handle_unknown="use_encoded_value", unknown_value=-1</code> to survive unseen categories.</p>
+<div class="callout real"><p><strong>Real-world:</strong> survey answers (Strongly disagree → Strongly agree, the Likert scale); education level (High school &lt; Bachelor &lt; Master &lt; PhD); clothing size (S &lt; M &lt; L &lt; XL); credit rating (C &lt; B &lt; A &lt; AAA); customer tier (Bronze &lt; Silver &lt; Gold); severity of a disease (mild &lt; moderate &lt; severe).</p></div>
+<div class="tw"><table>
+<tr><th></th><th>LabelEncoder</th><th>OrdinalEncoder</th></tr>
+<tr><td>Meant for</td><td>The target <code>y</code> (1-D)</td><td>Input features <code>X</code> (2-D, many columns)</td></tr>
+<tr><td>Order of numbers</td><td>Automatic (alphabetical)</td><td>Chosen by you via <code>categories</code></td></tr>
+<tr><td>Output</td><td>Integers</td><td>Floats</td></tr>
+</table></div>
+
+<h2>6. Which encoder should I use?</h2>
+<div class="demo" data-title="Encoder chooser" id="demo-choose">
+  <div class="db"><div id="chooseBody" style="min-height:140px"></div></div>
+  <div class="controls"><button class="btn" id="chooseReset">↺ Start over</button></div>
+</div>
+<div class="tw"><table>
+<tr><th>Technique</th><th>Columns created</th><th>Implies an order?</th><th>Good for</th><th>Risk</th></tr>
+<tr><td><strong>Label</strong></td><td>1</td><td>Yes (fake)</td><td>Target y; tree models</td><td>Misleads distance-based models</td></tr>
+<tr><td><strong>One-Hot</strong></td><td>1 per category</td><td>No</td><td>Nominal features, few categories</td><td>Many columns for high cardinality; dummy trap</td></tr>
+<tr><td><strong>Ordinal</strong></td><td>1</td><td>Yes (real)</td><td>Ranked categories</td><td>Wrong order = wrong model; equal spacing assumed</td></tr>
+</table></div>
+<p><strong>Other encoders you will meet</strong> (not required for this course): <em>Frequency encoding</em> (replace a category by how often it occurs), <em>Target / mean encoding</em> (replace by the average of the target for that category; powerful but must be done carefully to avoid leakage), <em>Binary / hashing encoding</em> (compact representations for very high cardinality) and <em>embeddings</em> in deep learning.</p>
+
+<h2>7. Feature scaling</h2>
+<p><strong>Feature scaling</strong> puts numeric features onto a comparable range so that no column dominates just because its numbers are bigger. Age runs 18–70; salary runs 20,000–120,000. Without scaling, a distance-based model sees salary as thousands of times more important than age, purely because of units.</p>
+<div class="callout analogy"><p><strong>A fair race.</strong> Imagine judging athletes by adding their 100 m time (about 10 seconds) to their marathon time (about 9,000 seconds). The marathon dominates the sum completely. Convert both to "how good compared to other athletes" first, and the comparison becomes fair. Scaling is that conversion.</p></div>
+<h3>Why it matters: three situations</h3>
+<ul>
+<li><strong>Distance-based algorithms</strong> (KNN, K-Means, SVM, DBSCAN, hierarchical clustering) directly add up differences across columns.</li>
+<li><strong>Gradient-descent-based models</strong> (linear/logistic regression, neural networks) converge much faster and more smoothly when features are on a similar scale.</li>
+<li><strong>Regularised models and PCA</strong> (Ridge, LASSO, PCA) penalise or compare coefficients/variances, so units matter.</li>
+</ul>
+<p><strong>Not needed for:</strong> Decision Trees, Random Forests, Gradient Boosting/XGBoost (they split on thresholds one feature at a time, so scale is irrelevant) and Naïve Bayes.</p>
+
+<h3>Watch scaling change who your nearest neighbour is</h3>
+<div class="demo" data-title="Who is most similar to Ann?" id="demo-scale-dist">
+  <div class="controls" data-controls></div>
+  <div class="db" data-canvas></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>The three main scalers</h3>
+<div class="tw"><table>
+<tr><th>Scaler</th><th>Formula</th><th>Result range</th><th>Use when</th></tr>
+<tr><td><strong>StandardScaler</strong> (z-score)</td><td>(value − mean) ÷ standard deviation</td><td>Mean 0, standard deviation 1 (no fixed bounds)</td><td>Default for most models; data roughly bell-shaped</td></tr>
+<tr><td><strong>MinMaxScaler</strong></td><td>(value − min) ÷ (max − min)</td><td>0 to 1</td><td>You need a bounded range (images, neural nets); no big outliers</td></tr>
+<tr><td><strong>RobustScaler</strong></td><td>(value − median) ÷ IQR</td><td>Median 0, IQR 1</td><td>Data with outliers</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Worked example</strong> with ages 20, 30, 40, 50, 60.</p>
+<p><em>StandardScaler.</em> Mean μ = (20+30+40+50+60)/5 = <strong>40</strong>. Squared deviations: 400, 100, 0, 100, 400 → sum 1000 → variance 1000/5 = 200 → σ = √200 = <strong>14.14</strong>. So z(20) = (20−40)/14.14 = <strong>−1.41</strong>, z(30) = −0.71, z(40) = 0, z(50) = 0.71, z(60) = 1.41.</p>
+<p><em>MinMaxScaler.</em> min = 20, max = 60, range 40. (20−20)/40 = <strong>0</strong>, (30−20)/40 = <strong>0.25</strong>, 0.5, 0.75, <strong>1</strong>.</p>
+<p><em>RobustScaler.</em> median = 40; Q1 = 30, Q3 = 50, IQR = 20. (20−40)/20 = <strong>−1</strong>, −0.5, 0, 0.5, <strong>1</strong>.</p>
+<p>Note scikit-learn's StandardScaler uses the population standard deviation (dividing by n, as above), not the sample one (n−1).</p></div>
+<div class="demo" data-title="How one outlier bends each scaler" id="demo-scalers">
+  <div class="controls" data-controls></div>
+  <div class="db" data-canvas></div>
+  <div class="db"><div class="tw"><table id="scTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>The syntax</h3>
+<pre class="code">
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()                        # or MinMaxScaler() / RobustScaler()
+X_train_s = scaler.fit_transform(X_train)        # learn mean & std from TRAIN only, then scale
+X_test_s  = scaler.transform(X_test)             # reuse the train mean & std: never fit on test!
+
+print(scaler.mean_, scaler.scale_)               # the learned μ and σ per column
+</pre>
+<div class="callout warn"><p><strong>Never fit the scaler (or encoder) on the test set.</strong> If test-set statistics leak into preprocessing, your evaluation is optimistic. <code>fit</code> on training data, <code>transform</code> on both. The same rule applies to encoders: fit them on the training data, so categories seen only in the test set must be handled (<code>handle_unknown</code>).</p></div>
+
+<h2>8. Putting it all together: <code>ColumnTransformer</code></h2>
+<p>Real tables have all column types at once. <code>ColumnTransformer</code> applies the right treatment to each group of columns, and <code>Pipeline</code> chains it with the model.</p>
+<pre class="code">
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+df = pd.DataFrame({
+    "age":    [25, 32, 47, 51, 38, 29],
+    "salary": [40000, 52000, 90000, 110000, 65000, 43000],
+    "city":   ["Pune", "Delhi", "Mumbai", "Pune", "Delhi", "Mumbai"],      # nominal
+    "level":  ["low", "medium", "high", "high", "medium", "low"],           # ordinal
+    "bought": [0, 0, 1, 1, 1, 0],                                            # target
+})
+X, y = df.drop(columns="bought"), df["bought"]
+
+prep = ColumnTransformer([
+    ("num", StandardScaler(),                                   ["age", "salary"]),
+    ("nom", OneHotEncoder(handle_unknown="ignore"),             ["city"]),
+    ("ord", OrdinalEncoder(categories=[["low", "medium", "high"]]), ["level"]),
+])
+
+model = Pipeline([("prep", prep), ("clf", LogisticRegression())])
+model.fit(X, y)                              # every step is fitted on the training data only
+print(model.predict(X.iloc[:2]))
+print(prep.get_feature_names_out())          # ['num__age' 'num__salary' 'nom__city_Delhi' ...]
+</pre>
+<p>Reading the <code>ColumnTransformer</code> list: each tuple is <code>(name, transformer, columns)</code>. Age and salary get scaled, city gets one-hot encoded, and level gets ordinal-encoded with the order we defined. Because everything sits inside one <code>Pipeline</code>, the same steps are applied automatically at prediction time.</p>
+
+<h2>9. Pre-processing in the real world</h2>
+<div class="cards">
+<div class="card"><h4>🏦 Credit scoring</h4><p>Income (thousands) and number of late payments (0–5) live on different scales, so scaling is needed before logistic regression or SVM. Employment type is one-hot encoded; credit grade is ordinal.</p></div>
+<div class="card"><h4>🖼️ Images</h4><p>Pixel values 0–255 are divided by 255 (min-max scaling) so a neural network trains stably.</p></div>
+<div class="card"><h4>🛍️ Recommendation</h4><p>Product categories are one-hot or embedded; price and rating are scaled before computing user-to-user distances.</p></div>
+<div class="card"><h4>🏥 Healthcare</h4><p>Lab values differ by orders of magnitude (glucose vs. white-cell count), so standardisation is essential. Symptom severity is ordinal.</p></div>
+<div class="card"><h4>📱 Telecom churn</h4><p>Contract type (month-to-month / 1-year / 2-year) is ordinal or one-hot; monthly bill and tenure are scaled.</p></div>
+<div class="card"><h4>🚗 Used-car pricing</h4><p>Brand is high-cardinality (grouped or target-encoded); fuel type one-hot; mileage skewed → log or robust scaling.</p></div>
+</div>
+<p><strong>Common mistakes.</strong> Fitting on the whole dataset before splitting (leakage); label-encoding a nominal <em>feature</em> and feeding it to KNN or a linear model; forgetting the double brackets <code>[[ ]]</code>; scaling one-hot columns unnecessarily (harmless but pointless); applying different preprocessing in production than in training. That last one is why we save the whole <code>Pipeline</code> with <code>joblib</code>.</p>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Models need numbers on comparable scales; pre-processing = <strong>cleaning + encoding + scaling</strong>.</li>
+<li><strong>LabelEncoder</strong>: 0…n−1 in alphabetical order, best for the target; misleading for features in distance-based models.</li>
+<li><strong>OneHotEncoder</strong>: one 0/1 column per category, no fake order (<code>sparse_output=False</code>, <code>get_feature_names_out()</code>, <code>drop</code>, <code>handle_unknown</code>).</li>
+<li><strong>OrdinalEncoder</strong>: numbers in <em>your</em> order via <code>categories=[[...]]</code>, for genuinely ranked data.</li>
+<li><code>fit_transform</code> = <code>fit</code> (learn) + <code>transform</code> (apply). Fit on train only; <code>transform</code> on test.</li>
+<li>Scale for distance/gradient/regularised models; trees don't need it. Use RobustScaler with outliers.</li>
+<li>Bundle everything in <code>ColumnTransformer</code> + <code>Pipeline</code>.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Create <code>df = pd.DataFrame({"size": ["S","XL","M","L","M"], "colour": ["red","blue","red","green","blue"], "price": [200, 450, 300, 380, 310]})</code>.</li>
+<li>Encode <code>size</code> with <code>OrdinalEncoder</code> (order S &lt; M &lt; L &lt; XL) and <code>colour</code> with <code>OneHotEncoder(sparse_output=False)</code>.</li>
+<li>Scale <code>price</code> with <code>StandardScaler</code>. Check that the scaled column has mean ≈ 0 and standard deviation ≈ 1 (<code>.mean()</code>, <code>.std(ddof=0)</code>).</li>
+<li>Bonus: put all three into one <code>ColumnTransformer</code> and print <code>get_feature_names_out()</code>.</li>
+</ol>
+<details><summary>Expected results</summary>
+<p>Size → 0, 3, 1, 2, 1. Colour columns (alphabetical): <code>colour_blue</code>, <code>colour_green</code>, <code>colour_red</code>; the first row (red) = 0, 0, 1. Price: mean = 328, population std ≈ 83.8, so 200 → −1.53 and 450 → 1.46.</p></details>
+</div>
+
+</article>
+<script src="../js/topics.js"></script>
+<script src="../js/lib/viz.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/pages/preprocessing.js"></script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Association Rule Learning · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="arl">
+<article id="lesson">
+
+<h1>Association Rule Learning</h1>
+<p class="lede">"Customers who buy bread and butter also tend to buy eggs." Association rule learning digs through thousands of shopping baskets (or any list of "things that happened together") and finds such if-then patterns automatically. There is no target to predict: it simply discovers what goes with what.</p>
+<div class="meta"><span class="chip">Beginner to intermediate</span><span class="chip plain">≈ 75 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: what goes together?</h2>
+<div class="callout analogy"><p><strong>The observant shopkeeper.</strong> After years behind the counter, a shopkeeper notices habits: people who buy pasta usually pick up sauce, and parents buying nappies often grab milk. He rearranges the shelves, offers discounts on pairs, and never runs out of the second item. Association rule learning is the shopkeeper's intuition done with arithmetic: count how often things occur together, and pick out the combinations that occur <em>more often than chance would explain</em>.</p></div>
+<p>The data is a list of <strong>transactions</strong> (baskets). Each transaction is a set of <strong>items</strong>. The words to know:</p>
+<div class="tw"><table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td><strong>Itemset</strong></td><td>Any group of items, e.g. {bread, butter}.</td></tr>
+<tr><td><strong>Rule</strong> X → Y</td><td>"If a basket contains X, it also tends to contain Y." X is the <em>antecedent</em> (if-part), Y is the <em>consequent</em> (then-part). X and Y are itemsets with no item in common.</td></tr>
+</table></div>
+<p>Like clustering and PCA it is <strong>unsupervised</strong>: there is no label; you decide what is "interesting" with thresholds. It is not limited to shops: the "items" can be symptoms in a patient record, web pages visited in a session, words used in a document, or products in a recommendation.</p>
+
+<h2>2. Three numbers: support, confidence, lift</h2>
+<p>A rule can only be judged with numbers. Suppose there are N baskets in total.</p>
+<div class="tw"><table>
+<tr><th>Measure</th><th>In words</th><th>Formula</th></tr>
+<tr><td><strong>Support</strong></td><td>How common is the itemset? The share of <em>all</em> baskets that contain it. Tells you if the pattern is common enough to matter.</td><td>support(X → Y) = (baskets containing X and Y) ÷ N</td></tr>
+<tr><td><strong>Confidence</strong></td><td>How reliable is the rule? Among the baskets that contain X, the share that also contain Y (a conditional probability).</td><td>confidence = support(X and Y) ÷ support(X)</td></tr>
+<tr><td><strong>Lift</strong></td><td>Is the rule better than chance? How many times more likely Y is <em>given</em> X than Y is in general.</td><td>lift = confidence ÷ support(Y)</td></tr>
+</table></div>
+<p>How to read lift: <b>lift = 1</b> means X and Y occur together exactly as often as if they were unrelated (independent). <b>Lift &gt; 1</b> means they occur together more often than chance: a real positive association. <b>Lift &lt; 1</b> means they occur together <em>less</em> often than chance: buying X makes Y less likely.</p>
+<h3>By hand: ten baskets</h3>
+<div class="tw"><table>
+<tr><th>Basket</th><th>Items</th></tr>
+<tr><td>1</td><td>bread, butter, milk</td></tr>
+<tr><td>2</td><td>bread, butter</td></tr>
+<tr><td>3</td><td>bread, butter, eggs</td></tr>
+<tr><td>4</td><td>milk, eggs</td></tr>
+<tr><td>5</td><td>bread, butter, milk, eggs</td></tr>
+<tr><td>6</td><td>milk</td></tr>
+<tr><td>7</td><td>bread, butter</td></tr>
+<tr><td>8</td><td>milk, eggs, cola</td></tr>
+<tr><td>9</td><td>bread, milk, cola</td></tr>
+<tr><td>10</td><td>bread, butter, eggs</td></tr>
+</table></div>
+<div class="callout math">
+<p>Counting: bread appears in <b>7</b> baskets, butter in <b>6</b>, milk in <b>6</b>, eggs in <b>5</b>, cola in <b>2</b>. Bread and butter appear together in baskets 1, 2, 3, 5, 7 and 10: <b>6</b> baskets.</p>
+<p><strong>Rule bread → butter.</strong> support = 6 ÷ 10 = <b>0.60</b>. confidence = 6 ÷ 7 = <b>0.857</b> (of the 7 bread baskets, 6 also have butter). lift = 0.857 ÷ 0.60 = <b>1.43</b> (butter is in 60% of all baskets but in 86% of the bread baskets: 1.43 times more likely). A strong rule.</p>
+<p><strong>The reverse rule butter → bread.</strong> support 0.60 (the same, it is the same itemset), confidence = 6 ÷ 6 = <b>1.00</b> (every butter basket has bread), lift = 1.00 ÷ 0.70 = <b>1.43</b> (the same lift: lift is symmetric, confidence is not).</p>
+<p><strong>Rule milk → eggs.</strong> milk and eggs appear together in baskets 4, 5 and 8: support = <b>0.30</b>. confidence = 3 ÷ 6 = <b>0.50</b>. lift = 0.50 ÷ 0.50 = <b>1.00</b>: eggs are in half of all baskets, and also in half of the milk baskets. Milk tells us nothing about eggs. <em>A confidence of 50% looks decent, and lift shows it is only the base rate.</em></p>
+<p><strong>Rule eggs → milk.</strong> confidence = 3 ÷ 5 = <b>0.60</b>, but milk is in 60% of <em>all</em> baskets, so lift = 0.60 ÷ 0.60 = <b>1.00</b>. Again no real association.</p>
+<p><strong>Rule milk → bread.</strong> together in baskets 1, 5 and 9: support 0.30; confidence = 3 ÷ 6 = 0.50; lift = 0.50 ÷ 0.70 = <b>0.71</b>: bread is in 70% of all baskets, but only in 50% of the milk baskets. Milk buyers are <em>less</em> likely than average to buy bread (in this tiny sample).</p></div>
+<div class="callout tip"><p><strong>Why confidence alone is dangerous.</strong> If 90% of all baskets contain bags, then "anything → bags" has a confidence of about 90%, however unrelated the item is. Lift divides that base rate out. Two other measures you will see: <strong>leverage</strong> = support(X and Y) − support(X) × support(Y) (how many more baskets than expected under independence, as a share of N; zero means independent), and <strong>conviction</strong> = (1 − support(Y)) ÷ (1 − confidence) (how much more often the rule would be wrong if X and Y were independent; 1 means independent, larger is stronger, infinity means the rule never fails). For bread → butter: leverage = 0.60 − 0.70 × 0.60 = 0.18, conviction = 0.40 ÷ 0.143 = 2.8.</p></div>
+<p>Build a rule of your own on a synthetic shop of 400 baskets (with a few habits hidden in it). Click products to place them on the left side [X] or the right side [Y]:</p>
+<div class="demo" data-title="Support, confidence and lift calculator" id="demo-calc">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Try 🍞 bread → 🧈 butter (lift well above 1), 🥤 cola → 🥛 milk (below 1) and 🍺 beer → 🥔 chips. Then make a rule whose Y is a very common item, such as 🥛 milk: the confidence may look high, and the lift brings you back to earth.</p>
+
+<h2>3. Finding frequent itemsets: the Apriori algorithm</h2>
+<p>The first task is to find every itemset that is common enough (support at least a chosen <strong>minimum support</strong>). The obvious way is to count every possible itemset, but a shop with n products has 2<sup>n</sup> − 1 of them: for 5 products 31, for 100 products about 1.3 × 10<sup>30</sup>, far too many to count.</p>
+<p>The <strong>Apriori</strong> algorithm avoids most of that work with one simple fact, the <strong>Apriori property</strong>:</p>
+<div class="callout math"><p><strong>If an itemset is infrequent, every larger itemset that contains it is infrequent too.</strong> If {butter, milk} appears in only 2 baskets, then {bread, butter, milk} can appear in at most those 2 baskets (adding an item can never make a set more common). So once a small itemset fails the test, we can discard all its supersets without ever counting them.</p></div>
+<p>So the algorithm works level by level:</p>
+<ol>
+<li><strong>Level 1:</strong> count every single item. Keep the frequent ones.</li>
+<li><strong>Level k:</strong> build <em>candidate</em> itemsets of size k by combining frequent (k − 1)-itemsets. <strong>Prune</strong> any candidate that has an infrequent subset (no need to count it). Count the surviving candidates in the data and keep the frequent ones.</li>
+<li>Stop when no candidates are left.</li>
+</ol>
+<div class="callout math">
+<p><strong>On our ten baskets with minimum support 0.3</strong> (at least 3 baskets):</p>
+<p><b>Level 1.</b> bread 7, butter 6, milk 6, eggs 5, cola 2. Cola (2 &lt; 3) is dropped: it can never be part of a frequent itemset.</p>
+<p><b>Level 2.</b> Candidates: the six pairs of the four frequent items. Counts: {bread, butter} 6 ✔, {bread, milk} 3 ✔, {bread, eggs} 3 ✔, {butter, milk} <b>2</b> ✘, {butter, eggs} 3 ✔, {milk, eggs} 3 ✔.</p>
+<p><b>Level 3.</b> There are four possible triples of the four items. Two of them, {bread, butter, milk} and {butter, milk, eggs}, contain the infrequent pair {butter, milk} and are <b>discarded without counting</b> (in fact {bread, butter, milk} occurs in only 2 baskets). The other two have all their pairs frequent, so they are counted: {bread, butter, eggs} occurs in baskets 3, 5 and 10: <b>3 ✔ frequent</b>; {bread, milk, eggs} occurs only in basket 5: 1 ✘.</p>
+<p><b>Level 4.</b> The only candidate {bread, butter, milk, eggs} contains infrequent subsets: nothing to count. Stop.</p>
+<p><strong>Result: 10 frequent itemsets</strong> (4 single items, 5 pairs, 1 triple), found after counting only 5 + 6 + 2 = 13 itemsets instead of all 31.</p></div>
+<div class="demo" data-title="Apriori, level by level" id="demo-apriori">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Move the minimum support: with a lower threshold more itemsets survive and more levels are needed; with a high threshold everything is pruned early. Choosing this threshold is the main practical decision (see section 6).</p>
+
+<h2>4. From itemsets to rules</h2>
+<p>Once the frequent itemsets are known, rules are easy. Take each frequent itemset with at least 2 items and split it in every possible way into an antecedent X and consequent Y. For each split, compute the confidence (and lift), and keep the rules above a <strong>minimum confidence</strong>. (No new counting is needed: all the supports were already found.)</p>
+<div class="callout math"><p><strong>The six rules from {bread, butter, eggs}</strong> (support 0.30 in each case):</p>
+<div class="tw"><table>
+<tr><th>Rule</th><th class="num">Confidence</th><th class="num">Lift</th><th>Reading</th></tr>
+<tr><td>{butter, eggs} → bread</td><td class="num">0.30 ÷ 0.30 = 1.00</td><td class="num">1.00 ÷ 0.70 = 1.43</td><td>every basket with butter and eggs also has bread</td></tr>
+<tr><td>{bread, eggs} → butter</td><td class="num">0.30 ÷ 0.30 = 1.00</td><td class="num">1.00 ÷ 0.60 = <b>1.67</b></td><td>strongest rule</td></tr>
+<tr><td>{bread, butter} → eggs</td><td class="num">0.30 ÷ 0.60 = 0.50</td><td class="num">0.50 ÷ 0.50 = 1.00</td><td>no better than chance</td></tr>
+<tr><td>butter → {bread, eggs}</td><td class="num">0.30 ÷ 0.60 = 0.50</td><td class="num">0.50 ÷ 0.30 = <b>1.67</b></td><td>butter makes the bread+eggs combination 1.67× more likely</td></tr>
+<tr><td>eggs → {bread, butter}</td><td class="num">0.30 ÷ 0.50 = 0.60</td><td class="num">0.60 ÷ 0.60 = 1.00</td><td>no better than chance</td></tr>
+<tr><td>bread → {butter, eggs}</td><td class="num">0.30 ÷ 0.70 = 0.43</td><td class="num">0.43 ÷ 0.30 = 1.43</td><td>below a min-confidence of 0.5: dropped</td></tr>
+</table></div></div>
+<p>Notice how three rules with confidence 0.5 or 0.6 have a lift of exactly 1.00: they look acceptable on confidence, but they carry no information. That is the point of lift.</p>
+<p>Now scale up. This scatter plot shows <em>every</em> rule mined from the 400-basket shop as a dot: how common it is (support, horizontal) against how reliable (confidence, vertical); big pink dots have high lift. The sliders are the three thresholds. Try to isolate the shop's four hidden habits.</p>
+<div class="demo" data-title="Every rule in a shop, as a dot" id="demo-rules">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>With the default filters a couple of dozen rules pass, and the top of the list is dominated by beer and chips combinations. Raise the <b>minimum lift</b> to 1.5: what survives is the real habits. Lower it to 0: hundreds of rules appear, most of them uninteresting.</li>
+<li>To find <i>negative</i> associations (things that avoid each other), set <b>minimum lift</b> and <b>minimum confidence</b> to 0 and look for the pale-blue dots, the ones with lift below 1 (for example 🥤 cola with 🥛 milk).</li>
+<li>Raise the <b>minimum support</b> to 0.2: only very common items survive, and the rare but strong rules (such as 🧷 diapers → 🥛 milk, whose itemset occurs in about 9% of baskets) disappear. This is the threshold trade-off in one slider.</li>
+</ul>
+
+<h2>5. Pitfalls</h2>
+<div class="callout warn"><ul>
+<li><strong>Too many rules.</strong> With many items and low thresholds you can get millions of rules. Some appear purely by chance (the more patterns you test, the more accidents you will find). Guard against this with a higher minimum support, a lift threshold, and by <em>checking the rules on data from a different period</em>.</li>
+<li><strong>Trivial and obvious rules.</strong> "Buys hot dogs → buys hot-dog buns" is true, and useless. The interesting rules are the ones you would not have guessed, and that someone can act on.</li>
+<li><strong>Association is not causation.</strong> Ice cream and sunscreen sell together, but ice cream does not cause sunscreen sales; the sun does. A rule shows that two things co-occur, not why.</li>
+<li><strong>Support threshold.</strong> Too high: you miss rare but valuable patterns (expensive items are bought seldom). Too low: an explosion of rules. Start high, then lower it.</li>
+<li><strong>Order and quantity are ignored.</strong> Only presence in the basket matters here. To take order into account (first this, later that), use <em>sequential pattern mining</em>.</li>
+<li><strong>The famous story.</strong> The tale of a store discovering that nappies and beer sell together is much repeated in textbooks, and may well be embellished; treat it as folklore and rely on your own data.</li>
+</ul></div>
+<p><strong>Faster algorithms:</strong> <strong>FP-Growth</strong> finds the very same frequent itemsets without generating candidates: it compresses the transactions into a tree (a frequent-pattern tree) and mines that. It is usually much faster on big data. (On our ten baskets I confirmed that Apriori and FP-Growth return identical itemsets.) <strong>Eclat</strong> is another variant.</p>
+
+<h2>6. Association rules in Python</h2>
+<p>scikit-learn does not include association rules. The standard tool is the <code>mlxtend</code> library (<code>pip install mlxtend</code>), which works on a table of True/False values, one row per basket and one column per item. The results below come from an actual run with mlxtend 0.25.0 and pandas (other versions may print slightly different columns).</p>
+<pre class="code">
+import pandas as pd
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori, fpgrowth, association_rules
+
+baskets = [["bread", "butter", "milk"], ["bread", "butter"], ["bread", "butter", "eggs"], ["milk", "eggs"],
+           ["bread", "butter", "milk", "eggs"], ["milk"], ["bread", "butter"], ["milk", "eggs", "cola"],
+           ["bread", "milk", "cola"], ["bread", "butter", "eggs"]]
+
+te = TransactionEncoder()
+df = pd.DataFrame(te.fit(baskets).transform(baskets), columns=te.columns_)   # one True/False column per item
+print(df.sum())      # bread 7, butter 6, cola 2, eggs 5, milk 6     -> our counts
+
+frequent = apriori(df, min_support=0.3, use_colnames=True)
+print(frequent)
+#    support  itemsets
+#      0.7    (bread)
+#      0.6    (butter)   0.6 (milk)   0.5 (eggs)
+#      0.6    (butter, bread)
+#      0.3    (eggs, bread)   (bread, milk)   (butter, eggs)   (eggs, milk)
+#      0.3    (butter, eggs, bread)                      &lt;- 10 frequent itemsets, exactly as we found by hand
+
+rules = association_rules(frequent, metric="confidence", min_threshold=0.5)
+print(rules[["antecedents", "consequents", "support", "confidence", "lift", "leverage", "conviction"]].round(3))
+#  butter        -> bread, eggs    support 0.3  confidence 0.500  lift 1.667  leverage 0.12  conviction 1.40
+#  bread, eggs   -> butter         support 0.3  confidence 1.000  lift 1.667  leverage 0.12  conviction inf
+#  bread         -> butter         support 0.6  confidence 0.857  lift 1.429  leverage 0.18  conviction 2.80
+#  butter        -> bread          support 0.6  confidence 1.000  lift 1.429  leverage 0.18  conviction inf
+#  butter, eggs  -> bread          support 0.3  confidence 1.000  lift 1.429  leverage 0.09  conviction inf
+#  milk          -> eggs           support 0.3  confidence 0.500  lift 1.000  leverage 0.00  conviction 1.00
+#  ... (8 more, including eggs -> milk with lift 1.0 and milk -> bread with lift 0.714)      13 rules in total
+
+strong = rules[(rules["lift"] &gt; 1.2) &amp; (rules["confidence"] &gt;= 0.8)]      # keep only the interesting, reliable ones
+same = fpgrowth(df, min_support=0.3, use_colnames=True)                   # FP-Growth: the same itemsets, faster on big data
+</pre>
+<p>All the numbers match the hand calculation: for example butter → bread has support 0.6, confidence 1.0 and lift 1.43, and the six rules from {bread, butter, eggs} include the two with lift 1.67. At <code>min_support=0.2</code> there are 14 frequent itemsets instead of 10 (cola and {butter, milk}, {cola, milk}, {bread, butter, milk} join).</p>
+<div class="tw"><table>
+<tr><th>Function / argument</th><th>What it does</th></tr>
+<tr><td><code>TransactionEncoder</code></td><td>Turns a list of item lists into a True/False table (rows = baskets, columns = items).</td></tr>
+<tr><td><code>apriori(df, min_support, use_colnames, max_len)</code></td><td>Frequent itemsets with at least the given support. <code>max_len</code> limits the itemset size; <code>use_colnames=True</code> shows names instead of column numbers.</td></tr>
+<tr><td><code>fpgrowth(...)</code></td><td>Same result as Apriori, with a faster algorithm; the preferred choice for larger data.</td></tr>
+<tr><td><code>association_rules(frequent, metric, min_threshold)</code></td><td>Builds the rules and their measures: antecedent/consequent supports, support, confidence, lift, leverage, conviction. Filter by <code>metric="confidence"</code> or <code>"lift"</code> with a minimum value.</td></tr>
+<tr><td>Practical tip</td><td>Start with a high <code>min_support</code> (for example 1 to 5% of baskets on real data), filter on lift, sort by lift × support, and only then look at individual rules with a domain expert.</td></tr>
+</table></div>
+
+<h2>7. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Simple, transparent: every rule is a sentence anyone can read</td><td>Can output far too many rules; many are trivial or accidental</td></tr>
+<tr><td>Needs no labels; finds patterns you did not think to look for</td><td>Only presence matters: no order, quantity, price or time</td></tr>
+<tr><td>Works on huge transaction logs (FP-Growth)</td><td>Shows co-occurrence, not cause and effect</td></tr>
+<tr><td>Directly actionable: shelf layout, bundles, promotions, recommendations</td><td>Rare-but-valuable items are lost at high support thresholds</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🛒 Market-basket analysis</h4><p>Shelf placement, bundle offers and coupons from what is bought together.</p></div>
+<div class="card"><h4>🎬 Recommendations</h4><p>"People who watched X also watched Y": simple item-to-item recommenders can be built from rules.</p></div>
+<div class="card"><h4>🩺 Medical records</h4><p>Which symptoms, drugs or conditions co-occur; spotting unexpected side-effect combinations for further study.</p></div>
+<div class="card"><h4>🌐 Web usage</h4><p>Pages visited together in a session guide site layout and navigation links.</p></div>
+<div class="card"><h4>🏦 Cross-selling</h4><p>Banks and insurers find which products customers hold together and offer the missing one.</p></div>
+<div class="card"><h4>🔎 Fraud and process mining</h4><p>Frequent combinations of events in logs; unusual combinations stand out against the frequent ones.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Association rules find "if X then Y" patterns in transaction data, with no labels.</li>
+<li><strong>Support</strong> = how common (baskets with both ÷ all baskets). <strong>Confidence</strong> = reliability (both ÷ baskets with X). <strong>Lift</strong> = confidence ÷ support(Y): above 1 = real association, 1 = independent, below 1 = they avoid each other. In our example bread → butter has support 0.60, confidence 0.86, lift 1.43, while milk → eggs has confidence 0.5 but lift 1.00.</li>
+<li><strong>Apriori</strong> finds the frequent itemsets level by level and uses the fact that <em>every superset of an infrequent itemset is infrequent</em> to skip most of the work (13 of 31 itemsets counted in our example). FP-Growth finds the same itemsets faster.</li>
+<li>Rules come from splitting each frequent itemset in all ways and keeping those above a minimum confidence (and, better, a minimum lift).</li>
+<li>Watch out for too many, trivial or accidental rules; association is not causation; validate on new data.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Of 20 baskets, 10 contain bread, 8 contain butter, and 6 contain both. Compute the support, confidence and lift of bread → butter. What does the lift mean?</li>
+<li>Rule X → Y has lift exactly 1.0. What does that say, and how would you describe it to the shop manager?</li>
+<li>support(milk) = 0.5, support(eggs) = 0.4, support(milk and eggs) = 0.2. Compute the lift of milk → eggs.</li>
+<li>In Apriori, the frequent pairs are {A,B}, {A,C} and {B,D}. Which triples do you have to count?</li>
+<li>Bonus: run the mlxtend code with <code>min_support=0.2</code> (and <code>min_threshold=0.5</code> for the rules). How many frequent itemsets do you get, and which rule involving cola appears?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Support = 6 ÷ 20 = <b>0.30</b>. Confidence = 6 ÷ 10 = <b>0.60</b>. Lift = 0.60 ÷ (8 ÷ 20 = 0.40) = <b>1.5</b>: bread buyers are 1.5 times more likely than the average customer to buy butter.</p>
+<p><b>2.</b> X and Y occur together exactly as often as expected by chance: knowing X gives no information about Y. To the manager: "the rule looks fine on confidence, but it is just the normal frequency of Y; there is no extra effect to exploit".</p>
+<p><b>3.</b> Confidence = 0.2 ÷ 0.5 = 0.4. Lift = 0.4 ÷ 0.4 = <b>1.0</b> (independent).</p>
+<p><b>4.</b> <b>None.</b> Candidate {A,B,C} needs {B,C} (not frequent), and {A,B,D} needs {A,D} (not frequent). Both are pruned without counting, and no other triple can be built from these pairs.</p>
+<p><b>5.</b> <b>14</b> frequent itemsets (the 10 from before plus cola, {butter, milk}, {cola, milk} and {bread, butter, milk}). The rules grow from 13 to 16; the new ones are <b>cola → milk</b> (support 0.2, confidence 1.0, lift 1.67: both cola baskets also contain milk, but with only 2 cola baskets this is very weak evidence), {butter, milk} → bread (confidence 1.0, lift 1.43) and {bread, milk} → butter (confidence 0.67, lift 1.11). Notice that a support of 0.2 means just 2 baskets, which is why tiny supports are dangerous.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/association-rules.js"></script>
+</body>
+</html>

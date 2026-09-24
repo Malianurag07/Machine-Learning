@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gradient Boosting · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="gb">
+<article id="lesson">
+
+<h1>Gradient Boosting</h1>
+<p class="lede">Start with a crude guess. Look at the mistakes you made. Train a small tree to predict those <em>mistakes</em>, add a small fraction of it to your guess, and repeat. Each tree nibbles away at what is left over, and hundreds of small corrections add up to one of the most accurate models for table-shaped data.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 100 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: fix the leftovers</h2>
+<p>AdaBoost improved its ensemble by <em>re-weighting the points</em> that were misclassified. Gradient Boosting takes a more general route: at every round it asks <strong>"what error is still left?"</strong> and trains the next small tree to predict exactly that error. The prediction of the whole model is simply the <strong>starting guess plus a small step from every tree</strong>.</p>
+<div class="callout analogy"><p><strong>Golf.</strong> The first shot goes roughly toward the hole. Now the ball lies 60 metres short. The second shot is not aimed at the hole from the tee; it is aimed at <em>the remaining 60 metres</em>. It lands 15 short. The third shot covers those 15. Each shot only fixes what the previous ones left over. And a sensible golfer does not swing at full power every time: taking measured, small shots (the <strong>learning rate</strong>) gives more control near the hole than a few huge swings that overshoot.</p></div>
+<h3>The recipe (regression)</h3>
+<ol>
+<li><strong>Start</strong> with a constant prediction: the average of y.</li>
+<li>Compute the <strong>residual</strong> of every training point: residual = actual − current prediction.</li>
+<li>Train a small tree (depth 1 to 5) to predict the <em>residuals</em> from the features.</li>
+<li>Update: new prediction = old prediction + <strong>learning rate × tree's output</strong>.</li>
+<li>Repeat steps 2 to 4 for the chosen number of trees.</li>
+</ol>
+<p>The final model is: <strong>F(x) = start + learning rate × (tree₁(x) + tree₂(x) + … + tree<sub>M</sub>(x))</strong>.</p>
+<div class="callout tip"><p><strong>Why is it called "gradient"?</strong> Suppose the score for a point is the squared error ½ × (actual − prediction)². How should the prediction change to lower the score fastest? Its <em>negative gradient</em> (the downhill direction) is exactly <b>actual − prediction</b>, the residual. So "fit a tree to the residuals" is the same as "take a step downhill on the loss, in the direction the trees can express". For other loss functions the residual is replaced by that loss's own negative gradient, and the recipe is unchanged. That one idea lets gradient boosting handle regression, classification, ranking and more.</p></div>
+<div class="tw"><table>
+<tr><th></th><th>Random Forest</th><th>AdaBoost</th><th>Gradient Boosting</th></tr>
+<tr><td>Trees built</td><td>in parallel, independent</td><td>in sequence</td><td>in sequence</td></tr>
+<tr><td>Next tree focuses on</td><td>(nothing: random)</td><td>re-weighted misclassified points</td><td>the residual error (negative gradient)</td></tr>
+<tr><td>Typical tree</td><td>deep</td><td>stump</td><td>small (depth 3 by default in scikit-learn)</td></tr>
+<tr><td>Combining</td><td>average or vote</td><td>α-weighted vote</td><td>sum of small steps</td></tr>
+<tr><td>Flexibility</td><td>fixed</td><td>exponential loss only</td><td>any differentiable loss</td></tr>
+</table></div>
+
+<h2>2. The maths by hand: regression</h2>
+<p>Six points, and we use stumps (depth-1 trees) with <strong>learning rate 0.5</strong>. Every tree splits the x-axis in two and predicts the average residual on each side.</p>
+<div class="tw"><table>
+<tr><th>x</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="num">6</td></tr>
+<tr><th>y</th><td class="num">2</td><td class="num">4</td><td class="num">3</td><td class="num">9</td><td class="num">11</td><td class="num">10</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Round 0: the start.</strong> The average of y is (2 + 4 + 3 + 9 + 11 + 10) ÷ 6 = <b>6.5</b>. Every prediction is 6.5. Mean squared error (MSE) = 77.5 ÷ 6 = <b>12.92</b>.</p>
+<p><strong>Round 1.</strong> Residuals = y − 6.5: <b>−4.5, −2.5, −3.5, +2.5, +4.5, +3.5</b>. The best single split of these residuals is <b>x ≤ 3.5</b> (total squared error 4.0; the other four splits give 53.2, 40.8, 29.5 and 62.8). Left average = (−4.5 − 2.5 − 3.5) ÷ 3 = <b>−3.5</b>, right average = <b>+3.5</b>. Update with learning rate 0.5: left predictions 6.5 + 0.5 × (−3.5) = <b>4.75</b>, right 6.5 + 0.5 × 3.5 = <b>8.25</b>. MSE falls to <b>3.73</b>.</p>
+<p><strong>Round 2.</strong> New residuals = y − prediction: <b>−2.75, −0.75, −1.75, +0.75, +2.75, +1.75</b>. Best split again x ≤ 3.5: left average <b>−1.75</b>, right <b>+1.75</b>. Update: 4.75 + 0.5 × (−1.75) = <b>3.875</b>; 8.25 + 0.5 × 1.75 = <b>9.125</b>. MSE = <b>1.43</b>.</p>
+<p><strong>Round 3.</strong> Residuals: <b>−1.875, +0.125, −0.875, −0.125, +1.875, +0.875</b>. Now a different split wins: <b>x ≤ 4.5</b> (squared error 2.92). Left (points 1 to 4) average = <b>−0.6875</b>, right (points 5, 6) = <b>+1.375</b>. Update: points 1 to 3 → 3.875 − 0.344 = <b>3.531</b>; point 4 → 9.125 − 0.344 = <b>8.781</b>; points 5, 6 → 9.125 + 0.6875 = <b>9.8125</b>. MSE = <b>0.72</b>.</p></div>
+<div class="tw"><table>
+<tr><th>After round</th><th>Prediction for x = 1, 2, 3</th><th>x = 4</th><th>x = 5, 6</th><th class="num">MSE</th></tr>
+<tr><td>0 (start)</td><td>6.500</td><td>6.500</td><td>6.500</td><td class="num">12.92</td></tr>
+<tr><td>1</td><td>4.750</td><td>8.250</td><td>8.250</td><td class="num">3.73</td></tr>
+<tr><td>2</td><td>3.875</td><td>9.125</td><td>9.125</td><td class="num">1.43</td></tr>
+<tr><td>3</td><td>3.531</td><td>8.781</td><td>9.813</td><td class="num">0.72</td></tr>
+<tr><td>actual y</td><td>2, 4, 3</td><td>9</td><td>11, 10</td><td class="num">0</td></tr>
+</table></div>
+<p>The error drops by half or more every round; a smaller learning rate would make it fall more slowly. A new point with x = 5 would be predicted <b>9.81</b>; x = 2 → <b>3.53</b>.</p>
+<div class="callout tip"><p><strong>Why not learning rate 1?</strong> With a rate of 1, round 1 would already jump to 3 and 10, the averages of each side. That looks great on six points but is exactly the problem: every tree would trust its own fit completely, including the noise. Taking only a <em>fraction</em> of each tree's suggestion ("shrinkage") forces the model to make progress through many small, cautious steps, and works better on new data. The price: you need more trees.</p></div>
+<div class="demo" data-title="Watch the model chase the residuals" id="demo-resid">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Round 0</strong> is a flat line; the residuals are the data with the average removed.</li>
+<li>Step the rounds up slowly with <strong>depth 1</strong> and watch the purple next-tree line (right) become smaller and smaller as the residuals shrink.</li>
+<li>Set the learning rate to 1 and depth to 4, and run past 40 rounds: the pink curve starts threading through individual noisy points.</li>
+</ul>
+
+<h2>3. Learning rate versus number of trees</h2>
+<p>The two knobs work as a pair: a <strong>small learning rate needs many trees</strong>. Below, three ensembles are trained on the same data, differing only in learning rate. Each curve shows the error on 120 unseen points as trees are added.</p>
+<div class="demo" data-title="The learning-rate trade-off" id="demo-lr">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout math"><p><strong>What to look for.</strong> The orange curve (rate 1) plunges fastest, hits its lowest point within a handful of trees, then <em>rises</em> steeply: it has begun memorising noise. The green curve (rate 0.05) needs many more trees (usually tens to over a hundred) to reach its lowest point, but that point is as good or better, and it climbs back up much more slowly afterwards. The purple curve (0.3) sits in between. Press "New random data" a few times: the pattern repeats, though the exact numbers change. In practice: choose a small rate (0.05 to 0.1) and let a validation set (or early stopping, see below) decide how many trees to use. <strong>Unlike a random forest, adding trees to a boosted model <em>can</em> overfit.</strong></p></div>
+
+<h2>4. Gradient boosting for classification</h2>
+<p>For a yes/no target the trees still predict <em>numbers</em>. The model keeps a running score in <strong>log-odds</strong> (the same scale logistic regression uses; see that lesson), and converts it to a probability with p = 1 ÷ (1 + e<sup>−score</sup>). The "error" that trees chase is again "actual minus current prediction", now <b>residual = y − p</b> where y is 0 or 1 and p is the current predicted probability.</p>
+<div class="callout math">
+<p>Same six x-values, labels <b>0, 0, 1, 1, 0, 1</b> (three of each class).</p>
+<p><strong>Start.</strong> The share of 1s is 3 ÷ 6 = 0.5, so start score = ln(0.5 ÷ 0.5) = <b>0</b> and every point has p = 0.5. The score for the model (log-loss = −[y ln p + (1 − y) ln(1 − p)], averaged) is ln 2 = <b>0.693</b>.</p>
+<p><strong>Residuals</strong> = y − p: <b>−0.5, −0.5, +0.5, +0.5, −0.5, +0.5</b>.</p>
+<p><strong>Round 1.</strong> Fit a stump to those residuals. Best split: <b>x ≤ 2.5</b> (squared error 0.75; the alternatives are 1.2, 1.33, 1.5, 1.2). Now the leaf values. A leaf could just be the average residual, but for log-loss the standard leaf value is a slightly cleverer "Newton step":</p>
+<p style="text-align:center"><b>leaf value = (sum of the residuals in the leaf) ÷ (sum of p × (1 − p) in the leaf)</b></p>
+<p>In words: the total correction the leaf's points want, scaled by how uncertain they still are (p × (1 − p) is largest when p is near 0.5). Left leaf (points 1, 2): (−0.5 − 0.5) ÷ (0.25 + 0.25) = −1 ÷ 0.5 = <b>−2</b>. Right leaf (points 3 to 6): (0.5 + 0.5 − 0.5 + 0.5) ÷ (4 × 0.25) = 1 ÷ 1 = <b>+1</b>.</p>
+<p>With learning rate 1, the new scores are −2 (points 1, 2) and +1 (points 3 to 6). Converting: p = 1 ÷ (1 + e<sup>2</sup>) = <b>0.119</b> for points 1 and 2; p = 1 ÷ (1 + e<sup>−1</sup>) = <b>0.731</b> for points 3 to 6. Log-loss = (2 × 0.127 + 3 × 0.313 + 1.313) ÷ 6 = <b>0.418</b>, down from 0.693. (Point 5 is the mislabelled-looking one, a 0 surrounded by 1s: it costs 1.313 and gets a large residual of −0.73 for the next tree to work on.)</p></div>
+<p>Round 2 repeats the whole thing with the new residuals (y − new p). After more rounds the probabilities sharpen towards 0 and 1, but with a learning rate below 1 they do so in gentler steps.</p>
+<div class="demo" data-title="Gradient boosting on curved classes" id="demo-2d">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class 1</span><span><i style="background:var(--c2)"></i>class 0</span><span>filled = training (size = how wrong/unsure the model still is) · hollow = test · lines: blue = training accuracy, orange = test accuracy</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>5. Gradient Boosting in scikit-learn</h2>
+<p>Our regression example (the depth-1 trees and rate 0.5 are set to match the hand calculation):</p>
+<pre class="code">
+import numpy as np
+from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
+
+X = np.arange(1, 7).reshape(-1, 1)
+y = np.array([2, 4, 3, 9, 11, 10.])
+
+gb = GradientBoostingRegressor(n_estimators=3, max_depth=1, learning_rate=0.5, random_state=0).fit(X, y)
+for step in gb.staged_predict(X):     # the prediction after 1, 2, 3 trees
+    print(step.round(3))
+# [4.75  4.75  4.75  8.25  8.25  8.25 ]
+# [3.875 3.875 3.875 9.125 9.125 9.125]
+# [3.531 3.531 3.531 8.781 9.812 9.812]   <- our hand calculation (9.8125 is shown as 9.812 by numpy's rounding)
+
+# the classification example: labels 0 0 1 1 0 1, one stump, learning rate 1
+yc = np.array([0, 0, 1, 1, 0, 1])
+clf = GradientBoostingClassifier(n_estimators=1, max_depth=1, learning_rate=1.0).fit(X, yc)
+print(clf.decision_function(X))        # [-2. -2.  1.  1.  1.  1.]   the log-odds we computed
+print(clf.predict_proba(X)[:, 1])      # [0.119 0.119 0.731 0.731 0.731 0.731]
+</pre>
+<p>Now a realistic run on the breast-cancer data. The comments are from an actual run with scikit-learn 1.9.0; other versions and seeds may differ a little.</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import GradientBoostingClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+gb = GradientBoostingClassifier(random_state=42).fit(X_train, y_train)   # 100 trees, depth 3, rate 0.1
+print(gb.score(X_test, y_test))                                          # 0.958
+print(cross_val_score(GradientBoostingClassifier(random_state=42), X, y, cv=5).mean())   # 0.963
+
+# 50 trees at rate 0.1 scored 0.944 on the test set; 200 trees scored 0.958
+
+# early stopping: let it stop when a held-out slice stops improving
+gb = GradientBoostingClassifier(n_estimators=1000, learning_rate=0.1,
+                                validation_fraction=0.2, n_iter_no_change=10,
+                                random_state=42).fit(X_train, y_train)
+print(gb.n_estimators_, gb.score(X_test, y_test))    # 130 trees were enough; test 0.951
+</pre>
+<p>All the boosted variants reach the same ballpark as the random forest (0.958) on this easy dataset: with only 143 test rows, one row is worth 0.7 percentage points, so differences of one or two rows mean little. The big gains of boosting show up on harder, larger datasets. Regression on the noisy diabetes data (R² on the same split as the Random Forest lesson):</p>
+<pre class="code">
+from sklearn.ensemble import GradientBoostingRegressor
+
+# default settings (100 trees, depth 3, rate 0.1)                        R² = 0.215
+# lower rate, shallower trees, and row sub-sampling
+gb = GradientBoostingRegressor(n_estimators=100, learning_rate=0.05, max_depth=2,
+                               subsample=0.8, random_state=0)           # R² = 0.315
+# (the random forest from the previous lesson scored 0.250 on this split)
+</pre>
+<p>Here careful settings beat both the defaults and the forest. That is typical: gradient boosting has more knobs than a forest, rewards tuning, and punishes careless defaults.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>n_estimators</code></td><td>Number of trees (default 100). Too many + a big rate = overfitting.</td></tr>
+<tr><td><code>learning_rate</code></td><td>Shrinks each tree's contribution (default 0.1). Lower is safer but needs more trees. Tune together with <code>n_estimators</code>.</td></tr>
+<tr><td><code>max_depth</code></td><td>Depth of each tree (default 3). Keep small: boosting wants <em>weak</em> learners. 2 to 5 is typical.</td></tr>
+<tr><td><code>subsample</code></td><td>Fraction of rows used per tree (default 1.0). Values like 0.5 to 0.8 ("stochastic gradient boosting") add randomness like a forest does and often help.</td></tr>
+<tr><td><code>max_features</code></td><td>Features considered per split, as in a random forest.</td></tr>
+<tr><td><code>min_samples_leaf</code></td><td>Minimum rows per leaf: stops leaves that fit a handful of noisy points.</td></tr>
+<tr><td><code>loss</code></td><td>Regressor: <code>"squared_error"</code> (default), <code>"absolute_error"</code>, <code>"huber"</code> (robust to outliers), <code>"quantile"</code>. Classifier: <code>"log_loss"</code> (default).</td></tr>
+<tr><td><code>validation_fraction</code>, <code>n_iter_no_change</code></td><td>Early stopping: hold out part of the data and stop when it stops improving. Then <code>n_estimators_</code> holds the number actually used.</td></tr>
+<tr><td><code>staged_predict</code>, <code>staged_predict_proba</code></td><td>Predictions after each tree: use them to plot a validation curve and pick the number of trees.</td></tr>
+<tr><td><code>feature_importances_</code></td><td>Impurity-based importance, as in a forest. (In one run on the breast-cancer data a single feature, "worst radius", took 56%.)</td></tr>
+<tr><td><code>HistGradientBoostingClassifier / Regressor</code></td><td>A much faster scikit-learn version for large datasets (bins the features into histograms). Handles missing values natively. Prefer it when you have tens of thousands of rows or more.</td></tr>
+</table></div>
+<p>A sensible recipe: start with <code>learning_rate=0.05 to 0.1</code>, <code>max_depth=3</code>, <code>subsample=0.8</code>, a generous <code>n_estimators</code> plus early stopping, then tune depth and <code>min_samples_leaf</code> with cross-validation (Grid Search CV is a lesson coming up).</p>
+
+<h2>6. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Often the most accurate method on tabular data</td><td>Many settings to tune; careless defaults can underperform a forest</td></tr>
+<tr><td>Flexible: any differentiable loss (robust, quantile, ranking...)</td><td>Trees are built one after another, so training cannot be parallelised across trees</td></tr>
+<tr><td>No feature scaling; handles non-linear patterns and interactions</td><td>Can overfit noise if too many trees or too large a rate; sensitive to label noise and outliers (unless a robust loss is used)</td></tr>
+<tr><td>Feature importances; works on mixed feature types once encoded</td><td>Harder to interpret than one tree; cannot extrapolate beyond the training range</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🔍 Web search ranking</h4><p>Boosted trees trained with ranking losses (such as LambdaMART) have powered the ordering of search results.</p></div>
+<div class="card"><h4>🏦 Credit risk and fraud</h4><p>Boosted trees on transaction and account features are a staple of banking and insurance models.</p></div>
+<div class="card"><h4>🚕 Demand and ETA forecasting</h4><p>Predicting delivery times, prices or demand from tabular features: the "residual correction" style suits noisy numeric targets.</p></div>
+<div class="card"><h4>🏆 Data-science competitions</h4><p>Gradient-boosted trees (in the XGBoost, LightGBM and CatBoost variants) have long been the go-to winners on tabular-data contests.</p></div>
+<div class="card"><h4>🛒 Click-through prediction</h4><p>Will this user click this ad? Log-loss boosted trees give calibrated probabilities from many mixed features.</p></div>
+<div class="card"><h4>⚡ Insurance pricing</h4><p>Regression with a quantile or Huber loss to predict costs while limiting the influence of a few extreme claims.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Gradient boosting builds small trees <strong>one after another</strong>, each trained to predict the <strong>residuals</strong> (the negative gradient of the loss) of the model so far.</li>
+<li>Prediction = <strong>start + learning rate × (sum of the trees' outputs)</strong>. In the worked example the error fell 12.92 → 3.73 → 1.43 → 0.72 with three stumps.</li>
+<li>For classification, the model keeps a <strong>log-odds</strong> score; the residual is y − p and leaves use (sum of residuals) ÷ (sum of p(1−p)).</li>
+<li>A <strong>small learning rate with many trees</strong> generalises best; boosting <em>can</em> overfit as trees are added, so use validation or early stopping.</li>
+<li>Keep trees <strong>shallow</strong> (weak learners), and consider <code>subsample</code> below 1. For big data use <code>HistGradientBoosting*</code>.</li>
+<li>AdaBoost is a special case of the same idea (exponential loss, re-weighting points). XGBoost, next, is a faster, more regularised implementation.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>Three houses cost y = 5, 7, 9 (in units of 10k). The starting prediction is the average. What is it, and what are the three residuals?</li>
+<li>A point has actual value 16 and current prediction 10. The next tree predicts 5.5 for it and the learning rate is 0.2. What is the new prediction and the new residual?</li>
+<li>Classification: the current score for a point is 0 and its true label is 1. What is p and what is the residual? After a leaf update makes the score +1, what are p (about 0.731) and the new residual?</li>
+<li>Two points sit in the same leaf, both with p = 0.5 and true label 1. Compute the leaf value using (sum of residuals) ÷ (sum of p(1 − p)), then the new probability with learning rate 1.</li>
+<li>Bonus: on the breast-cancer code, plot the test accuracy after each tree using <code>staged_predict</code>. Where does it peak, and how does that compare with the early-stopping result?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> Average = (5 + 7 + 9) ÷ 3 = <b>7</b>. Residuals: 5 − 7 = <b>−2</b>, 7 − 7 = <b>0</b>, 9 − 7 = <b>+2</b>.</p>
+<p><b>2.</b> New prediction = 10 + 0.2 × 5.5 = <b>11.1</b>. New residual = 16 − 11.1 = <b>4.9</b>. (Only a small step towards the target: the rest is left for later trees.)</p>
+<p><b>3.</b> p = 1 ÷ (1 + e<sup>0</sup>) = <b>0.5</b>, residual = 1 − 0.5 = <b>0.5</b>. After the update p = 0.731, residual = 1 − 0.731 = <b>0.269</b>.</p>
+<p><b>4.</b> Residuals are 0.5 and 0.5, sum = 1. p(1 − p) = 0.25 each, sum = 0.5. Leaf value = 1 ÷ 0.5 = <b>2</b>. New score = 0 + 2 = 2, so p = 1 ÷ (1 + e<sup>−2</sup>) = <b>0.881</b>.</p>
+<p><b>5.</b> In my run, the best test accuracy (0.958) was reached at tree 74 of 100, and early stopping used 130 trees on a slightly different setup (0.951). On a test set this small, differences of one row are just noise; the point is that you do not need to use all the trees.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/gradient-boosting.js"></script>
+</body>
+</html>

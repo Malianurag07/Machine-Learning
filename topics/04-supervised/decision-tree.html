@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Tree · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="dt">
+<article id="lesson">
+
+<h1>Decision Tree</h1>
+<p class="lede">A Decision Tree predicts by asking a chain of simple yes/no questions, like a game of Twenty Questions. It is the most readable model in machine learning, and the building block of Random Forests and Gradient Boosting.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 90 min</span><span class="chip plain">5 interactive demos</span></div>
+
+<h2>1. The big idea</h2>
+<div class="callout analogy"><p><strong>Twenty Questions.</strong> To guess an animal you don't ask random things. You ask the question that <em>rules out the most possibilities</em>: "Is it a mammal?" cuts the field roughly in half; "Does it have a striped coat?" would be a terrible first question. A decision tree learns, from data, which question to ask first, which second, and so on, until it is confident enough to answer.</p></div>
+<p>The result is a flowchart. To predict for a new example you simply <strong>walk down the tree</strong>, answering each question about that example, until you arrive at an answer. Anyone can follow it, and you can print it and hand it to a doctor or a loan officer.</p>
+<div class="tw"><table>
+<tr><th>Part of the tree</th><th>What it is</th></tr>
+<tr><td><strong>Root node</strong></td><td>The first question, asked about every example.</td></tr>
+<tr><td><strong>Internal (decision) node</strong></td><td>A question about one feature ("Is Outlook = Sunny?", "Is age ≤ 30?").</td></tr>
+<tr><td><strong>Branch</strong></td><td>One possible answer to a question.</td></tr>
+<tr><td><strong>Leaf node</strong></td><td>The end of a path: the prediction (a class, or a number for regression).</td></tr>
+<tr><td><strong>Depth</strong></td><td>How many questions deep the longest path is.</td></tr>
+</table></div>
+<p>The whole learning problem is: <strong>which question should each node ask?</strong> The answer: the one that makes the groups after the split as <em>pure</em> as possible. To measure purity we need a number.</p>
+
+<h2>2. Measuring impurity: Gini and entropy</h2>
+<p>A group is <strong>pure</strong> if all its members have the same label (all "Yes"), and <strong>impure</strong> when the labels are mixed. Two standard scores, both 0 for a pure group and biggest for a 50/50 mix. If p is the fraction of "Yes":</p>
+<div class="tw"><table>
+<tr><th>Score</th><th>In words</th><th>Formula (two classes)</th><th>Range</th></tr>
+<tr><td><strong>Gini impurity</strong> (scikit-learn's default)</td><td>1 minus the sum of squared class shares. Also the chance of mislabelling a random item if you label it at random using the group's proportions.</td><td>1 − p² − (1−p)²</td><td>0 to 0.5</td></tr>
+<tr><td><strong>Entropy</strong></td><td>How "surprised" you are on average by a random item's label, in bits. Mixed groups are more surprising.</td><td>−p·log₂(p) − (1−p)·log₂(1−p)</td><td>0 to 1</td></tr>
+</table></div>
+<div class="tw"><table>
+<tr><th>Group (Yes / No)</th><th class="num">p (Yes)</th><th class="num">Gini</th><th class="num">Entropy</th><th>Feeling</th></tr>
+<tr><td>5 / 5</td><td class="num">0.5</td><td class="num">0.500</td><td class="num">1.000</td><td>Maximum mess</td></tr>
+<tr><td>7 / 3</td><td class="num">0.7</td><td class="num">0.420</td><td class="num">0.881</td><td>Fairly mixed</td></tr>
+<tr><td>9 / 1</td><td class="num">0.9</td><td class="num">0.180</td><td class="num">0.469</td><td>Mostly pure</td></tr>
+<tr><td>10 / 0</td><td class="num">1.0</td><td class="num">0.000</td><td class="num">0.000</td><td>Perfectly pure</td></tr>
+</table></div>
+<div class="demo" data-title="Impurity meters: how mixed is the group?" id="demo-imp">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>The two curves have the same shape: peak at a 50/50 mix, zero when pure. In practice they choose almost identical trees, so don't agonise over which to use.</p>
+
+<h2>3. Information gain: choosing the best question</h2>
+<p>A question splits a group into smaller groups. A good question makes the smaller groups purer. We score a split like this:</p>
+<div class="callout math"><p><strong>Information gain = (impurity before the split) − (average impurity after the split).</strong></p>
+<p>"Average after" is weighted: a group with more members counts for more. So weighted impurity after = Σ (group size ÷ total) × (group impurity). The split with the <strong>biggest gain</strong> wins. (When you use entropy this quantity is called <em>information gain</em>; with Gini it is the <em>Gini decrease</em>.)</p></div>
+
+<h3>A worked example: should we play cricket today?</h3>
+<p>Over 14 days we noted the weather and whether the match was played:</p>
+<div class="tw"><table>
+<tr><th class="num">Day</th><th>Outlook</th><th>Temperature</th><th>Humidity</th><th>Wind</th><th>Play?</th></tr>
+<tr><td class="num">1</td><td>Sunny</td><td>Hot</td><td>High</td><td>Weak</td><td>No</td></tr>
+<tr><td class="num">2</td><td>Sunny</td><td>Hot</td><td>High</td><td>Strong</td><td>No</td></tr>
+<tr><td class="num">3</td><td>Overcast</td><td>Hot</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">4</td><td>Rain</td><td>Mild</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">5</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">6</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Strong</td><td>No</td></tr>
+<tr><td class="num">7</td><td>Overcast</td><td>Cool</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+<tr><td class="num">8</td><td>Sunny</td><td>Mild</td><td>High</td><td>Weak</td><td>No</td></tr>
+<tr><td class="num">9</td><td>Sunny</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">10</td><td>Rain</td><td>Mild</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">11</td><td>Sunny</td><td>Mild</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+<tr><td class="num">12</td><td>Overcast</td><td>Mild</td><td>High</td><td>Strong</td><td>Yes</td></tr>
+<tr><td class="num">13</td><td>Overcast</td><td>Hot</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+<tr><td class="num">14</td><td>Rain</td><td>Mild</td><td>High</td><td>Strong</td><td>No</td></tr>
+</table></div>
+<p><strong>Step 1: impurity of the whole dataset.</strong> 9 days "Yes", 5 days "No" (p = 9/14 = 0.643).</p>
+<div class="callout math"><p>Entropy = −(9/14)·log₂(9/14) − (5/14)·log₂(5/14) = 0.410 + 0.530 = <strong>0.940</strong>.
+<br>Gini = 1 − (9/14)² − (5/14)² = 1 − 0.413 − 0.128 = <strong>0.459</strong>.</p></div>
+<p><strong>Step 2: try each question at the root.</strong> Take <em>Outlook</em>. It splits the 14 days into three groups:</p>
+<div class="callout math">
+<div class="tw"><table>
+<tr><th>Outlook</th><th>Days</th><th>Yes / No</th><th class="num">Entropy</th><th class="num">Gini</th></tr>
+<tr><td>Sunny</td><td class="num">5</td><td>2 / 3</td><td class="num">0.971</td><td class="num">0.480</td></tr>
+<tr><td>Overcast</td><td class="num">4</td><td>4 / 0</td><td class="num">0.000 (pure!)</td><td class="num">0.000</td></tr>
+<tr><td>Rain</td><td class="num">5</td><td>3 / 2</td><td class="num">0.971</td><td class="num">0.480</td></tr>
+</table></div>
+<p>Weighted entropy after = (5/14)(0.971) + (4/14)(0) + (5/14)(0.971) = 0.347 + 0 + 0.347 = <strong>0.694</strong>.
+<br>Information gain = 0.940 − 0.694 = <strong>0.247</strong>.
+<br>(Gini version: weighted = (5/14)(0.48) + 0 + (5/14)(0.48) = 0.343, gain = 0.459 − 0.343 = 0.116.)</p></div>
+<p>Do the same for every other feature:</p>
+<div class="tw"><table>
+<tr><th>Question (feature)</th><th>Groups</th><th class="num">Weighted entropy after</th><th class="num">Information gain</th><th class="num">Gini gain</th></tr>
+<tr><td><strong>Outlook</strong></td><td>Sunny 2Y/3N · Overcast 4Y/0N · Rain 3Y/2N</td><td class="num">0.694</td><td class="num"><b>0.247</b></td><td class="num">0.116</td></tr>
+<tr><td>Humidity</td><td>High 3Y/4N · Normal 6Y/1N</td><td class="num">0.789</td><td class="num">0.152</td><td class="num">0.092</td></tr>
+<tr><td>Wind</td><td>Weak 6Y/2N · Strong 3Y/3N</td><td class="num">0.892</td><td class="num">0.048</td><td class="num">0.031</td></tr>
+<tr><td>Temperature</td><td>Hot 2Y/2N · Mild 4Y/2N · Cool 3Y/1N</td><td class="num">0.911</td><td class="num">0.029</td><td class="num">0.019</td></tr>
+</table></div>
+<p><strong>Outlook wins</strong> under both scores, so it becomes the root. Its <em>Overcast</em> branch is already pure (always "Yes"), so it becomes a leaf. The other two branches are still mixed, so we <strong>repeat the same procedure on each of them separately</strong> (this is called <em>recursive partitioning</em>):</p>
+<ul>
+<li><strong>Sunny (2 Yes, 3 No):</strong> Humidity gives gain 0.971 (the maximum possible here): High → all "No", Normal → all "Yes". Two pure leaves.</li>
+<li><strong>Rain (3 Yes, 2 No):</strong> Wind gives gain 0.971: Weak → all "Yes", Strong → all "No". Two pure leaves.</li>
+</ul>
+<p>The finished tree in words: <em>"If Overcast → play. If Sunny → play only when Humidity is Normal. If Rain → play only when Wind is Weak."</em> Build it yourself, one level at a time, and test a forecast:</p>
+<div class="demo" data-title="Grow the tree level by level" id="demo-tree">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="treeTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>4. Numeric features: choosing a threshold</h2>
+<p>For a number such as hours studied, there is no fixed list of answers, so the tree asks a yes/no question of the form <strong>"is x ≤ t?"</strong>. Which t? Try <em>every</em> midpoint between neighbouring values, score each with Gini, and keep the best.</p>
+<div class="callout math"><p>Data: hours = 1, 2, 3, 4, 5, 6 with result = fail, fail, pass, fail, pass, pass (3 fail, 3 pass, so Gini before = 0.5).</p>
+<div class="tw"><table>
+<tr><th>Threshold t</th><th>Left group (x ≤ t)</th><th>Right group</th><th class="num">Weighted Gini after</th><th class="num">Gain</th></tr>
+<tr><td class="num">1.5</td><td>{1}: 0 pass / 1 fail → 0</td><td>{2..6}: 3 pass / 2 fail → 0.48</td><td class="num">(1/6)(0) + (5/6)(0.48) = 0.400</td><td class="num">0.100</td></tr>
+<tr><td class="num"><b>2.5</b></td><td>{1,2}: both fail → 0</td><td>{3,4,5,6}: 3 pass / 1 fail → 0.375</td><td class="num">(2/6)(0) + (4/6)(0.375) = <b>0.250</b></td><td class="num"><b>0.250</b></td></tr>
+<tr><td class="num">3.5</td><td>{1,2,3}: 1 pass / 2 fail → 0.444</td><td>{4,5,6}: 2 pass / 1 fail → 0.444</td><td class="num">0.444</td><td class="num">0.056</td></tr>
+<tr><td class="num"><b>4.5</b></td><td>{1..4}: 1 pass / 3 fail → 0.375</td><td>{5,6}: both pass → 0</td><td class="num">(4/6)(0.375) + (2/6)(0) = <b>0.250</b></td><td class="num"><b>0.250</b></td></tr>
+<tr><td class="num">5.5</td><td>{1..5}: 2 pass / 3 fail → 0.48</td><td>{6}: pass → 0</td><td class="num">(5/6)(0.48) + 0 = 0.400</td><td class="num">0.100</td></tr>
+</table></div>
+<p>The best splits are t = 2.5 and t = 4.5 (tied at gain 0.25). The tree picks one and continues.</p></div>
+<div class="demo" data-title="Slide the threshold and watch the impurity" id="demo-thr">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>With several numeric features the tree tries every threshold of every feature at each node and takes the overall best. Because each question involves one feature at a time, the decision boundaries are always <strong>axis-aligned rectangles</strong>.</p>
+
+<h2>5. Overfitting: a tree that memorises</h2>
+<p>If you keep splitting until every leaf is pure, the tree can memorise the training data perfectly, even the noise and mislabelled examples: 100% training accuracy but poorer accuracy on new data. Such a tree is deep, with tiny leaves, and its rules (<em>"if x ≤ 3.17 and y &gt; 0.82…"</em>) are meaningless. It is the same overfitting story as before, and trees are especially prone to it.</p>
+<div class="callout analogy"><p><strong>A student who memorises.</strong> A student who memorises every past exam question and answer gets 100% on the practice papers but stumbles on a new question. A tree with unlimited depth memorises the training set in exactly the same way. Limiting the depth forces it to learn the general rules instead.</p></div>
+<p>You can control the size of the tree (this is called <strong>regularisation</strong> or <strong>pruning</strong>):</p>
+<div class="tw"><table>
+<tr><th>Hyperparameter</th><th>What it limits</th></tr>
+<tr><td><code>max_depth</code></td><td>The maximum number of questions in a row. The most important one.</td></tr>
+<tr><td><code>min_samples_split</code></td><td>A node needs at least this many samples before it may split.</td></tr>
+<tr><td><code>min_samples_leaf</code></td><td>Every leaf must keep at least this many samples (bigger = smoother, less noise-chasing).</td></tr>
+<tr><td><code>max_leaf_nodes</code>, <code>max_features</code></td><td>Cap the number of leaves; limit how many features are considered at each split.</td></tr>
+<tr><td><code>ccp_alpha</code></td><td>Cost-complexity pruning: grow the full tree, then cut away branches that don't earn their keep.</td></tr>
+</table></div>
+<div class="demo" data-title="Depth and leaf size: from underfit to memorised" id="demo-2d">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class A</span><span><i style="background:var(--c2)"></i>class B</span><span>filled = training · hollow = test · shading = the tree's prediction</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>At depth 1 the tree draws a single straight cut (underfit). As depth grows, the boundary becomes a staircase of rectangles that hugs the training points, and <strong>training accuracy climbs to 100% while test accuracy stalls or drops</strong>. Raising <em>min_samples_leaf</em> tames it.</p>
+
+<h2>6. Regression trees</h2>
+<p>To predict a number, the tree works the same way, with two changes: each leaf predicts the <strong>average</strong> of the training values that reached it, and a split is judged by how much it reduces the <strong>squared error</strong> (the sum of squared differences from the group's average) instead of Gini.</p>
+<div class="callout math"><p>Data: x = 1..6 and y = 1.0, 1.2, 0.9, 3.1, 3.0, 2.9. Average y = 2.017; total squared error = <strong>5.868</strong>.
+<br>Try t = 3.5: left {1.0, 1.2, 0.9} average 1.033, error 0.047; right {3.1, 3.0, 2.9} average 3.0, error 0.020. Total = <strong>0.067</strong>, a huge drop. Compare t = 2.5: total 3.348; t = 4.5: total 3.255. So the best split is x ≤ 3.5, and the tree predicts <strong>1.03</strong> for x ≤ 3.5 and <strong>3.0</strong> above it.</p></div>
+<div class="demo" data-title="A regression tree is a staircase" id="demo-reg">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Like KNN regression, a tree predicts a flat value inside each leaf, so the prediction is a staircase, and it can't extrapolate beyond the range of values it has seen.</p>
+
+<h2>7. Feature importance</h2>
+<p>Every time a feature is used in a split, it reduces impurity by some amount (weighted by how many samples were at that node). Add up these reductions per feature and normalise so they sum to 1: that is <code>feature_importances_</code>. In our cricket tree, <em>Outlook</em> (used at the root, where all 14 samples were affected) would score highest. Caveats: importances are computed on the training data, can favour features with many distinct values, and split credit among correlated features arbitrarily. For a fairer view use <code>permutation_importance</code> on test data.</p>
+
+<h2>8. Decision trees in scikit-learn</h2>
+<p>Trees need no scaling and no normalisation, which is a big convenience. Categorical text must still be encoded (see the pre-processing lesson), and scikit-learn's trees always make <em>binary</em> splits, so a category like Outlook becomes columns such as <code>Outlook_Overcast</code> (a yes/no question), and the tree it draws can look a little different from our three-way diagram.</p>
+<pre class="code">
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier, export_text, plot_tree
+
+df = pd.DataFrame({
+    "Outlook":  ["Sunny","Sunny","Overcast","Rain","Rain","Rain","Overcast","Sunny","Sunny","Rain","Sunny","Overcast","Overcast","Rain"],
+    "Humidity": ["High","High","High","High","Normal","Normal","Normal","High","Normal","Normal","Normal","High","Normal","High"],
+    "Wind":     ["Weak","Strong","Weak","Weak","Weak","Strong","Strong","Weak","Weak","Weak","Strong","Strong","Weak","Strong"],
+    "Play":     ["No","No","Yes","Yes","Yes","No","Yes","No","Yes","Yes","Yes","Yes","Yes","No"],
+})
+X = pd.get_dummies(df[["Outlook", "Humidity", "Wind"]])      # one-hot encode the text columns
+y = df["Play"]
+
+tree = DecisionTreeClassifier(criterion="entropy", max_depth=3, random_state=0)   # or "gini"
+tree.fit(X, y)
+
+print(export_text(tree, feature_names=list(X.columns)))     # the tree as readable rules
+print(dict(zip(X.columns, tree.feature_importances_.round(2))))
+print(tree.predict(pd.get_dummies(pd.DataFrame({"Outlook": ["Sunny"], "Humidity": ["Normal"], "Wind": ["Weak"]}))
+                   .reindex(columns=X.columns, fill_value=0)))   # -> ['Yes']
+# plot_tree(tree, feature_names=X.columns, class_names=tree.classes_, filled=True)   # a picture (needs matplotlib)
+</pre>
+<p>Tuning the tree size with cross-validation (never with the training score!):</p>
+<pre class="code">
+from sklearn.datasets import load_iris
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+X, y = load_iris(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42, stratify=y)
+
+grid = GridSearchCV(DecisionTreeClassifier(random_state=0),
+                    {"max_depth": [1, 2, 3, 4, 5, None],
+                     "min_samples_leaf": [1, 2, 5, 10],
+                     "criterion": ["gini", "entropy"]},
+                    cv=5)
+grid.fit(X_train, y_train)
+print(grid.best_params_, grid.score(X_test, y_test))
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter / method</th><th>What it does</th></tr>
+<tr><td><code>criterion</code></td><td><code>"gini"</code> (default), <code>"entropy"</code> or <code>"log_loss"</code> for classifiers; <code>"squared_error"</code> for <code>DecisionTreeRegressor</code>.</td></tr>
+<tr><td><code>max_depth</code>, <code>min_samples_leaf</code>, <code>ccp_alpha</code></td><td>The size controls from section 5.</td></tr>
+<tr><td><code>random_state</code></td><td>Ties between equally good splits are broken randomly; fix it for repeatable trees.</td></tr>
+<tr><td><code>class_weight="balanced"</code></td><td>Helps with imbalanced classes.</td></tr>
+<tr><td><code>predict_proba</code></td><td>The class shares in the leaf the example lands in.</td></tr>
+<tr><td><code>export_text</code>, <code>plot_tree</code></td><td>Show the learned rules as text or as a diagram.</td></tr>
+</table></div>
+
+<h2>9. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Easy to understand and explain; rules can be printed</td><td>Overfits easily if left to grow</td></tr>
+<tr><td>No feature scaling; works with numbers and categories</td><td>Unstable: a small change in the data can give a very different tree</td></tr>
+<tr><td>Captures non-linear patterns and feature interactions</td><td>Axis-aligned cuts approximate diagonal boundaries poorly</td></tr>
+<tr><td>Fast prediction; gives feature importances</td><td>Greedy (each split is chosen without looking ahead); can't extrapolate</td></tr>
+</table></div>
+<p>The instability is the big weakness, and it has a famous cure: build <strong>many</strong> different trees and average their votes. That is the <strong>Random Forest</strong>, and building trees one after another to fix each other's mistakes is <strong>Gradient Boosting / XGBoost</strong>. Both are coming up, and both are built from exactly the trees you just learned.</p>
+<div class="cards">
+<div class="card"><h4>🏦 Loan approval</h4><p>"Income &gt; X and no missed payments → approve." Regulators like rules a human can read.</p></div>
+<div class="card"><h4>🏥 Medical triage</h4><p>Emergency protocols are often literally decision trees: chest pain? → age? → ECG abnormal? → urgent.</p></div>
+<div class="card"><h4>📞 Support routing</h4><p>Classify tickets and route them by product, urgency and customer tier.</p></div>
+<div class="card"><h4>🏭 Fault diagnosis</h4><p>From sensor readings, find the branch that leads to "bearing wear", with rules engineers can check.</p></div>
+<div class="card"><h4>📱 Churn rules</h4><p>Discover interpretable segments ("contract &lt; 6 months and ≥ 3 complaints") and target them.</p></div>
+<div class="card"><h4>🎮 Game AI</h4><p>Non-player characters decide what to do using tree-like logic (behaviour trees).</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>A tree asks a sequence of yes/no questions; each leaf gives a prediction.</li>
+<li>It chooses each question by <strong>information gain</strong>: (impurity before) − (weighted impurity after), using <strong>Gini</strong> or <strong>entropy</strong>.</li>
+<li>It grows by repeating that choice on each new group (recursive partitioning), for numbers trying every threshold.</li>
+<li>Left alone it <strong>overfits</strong>: control it with <code>max_depth</code>, <code>min_samples_leaf</code> or pruning, and choose values by cross-validation.</li>
+<li>Regression trees predict the leaf average and split to reduce squared error.</li>
+<li>Readable and scale-free, but unstable, so ensembles of trees (Random Forest, boosting) are the next step.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A node holds 6 "Yes" and 4 "No". Compute its Gini impurity and its entropy.</li>
+<li>A question splits that node into a left group (4 Yes, 0 No) and a right group (2 Yes, 4 No). Compute the weighted Gini after the split and the Gini gain. Is it a good question?</li>
+<li>Using the cricket tree, predict the outcome for: (a) Overcast, High humidity, Strong wind; (b) Sunny, High humidity, Weak wind; (c) Rain, Normal humidity, Strong wind.</li>
+<li>Bonus: fit scikit-learn trees on the cricket data with <code>max_depth=1</code>, <code>2</code> and <code>None</code>. Use <code>export_text</code> and compare. Which depth is enough to classify all 14 rows correctly?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> p = 0.6. Gini = 1 − 0.36 − 0.16 = <b>0.48</b>. Entropy = −0.6·log₂0.6 − 0.4·log₂0.4 = 0.442 + 0.529 = <b>0.971</b>.</p>
+<p><b>2.</b> Left Gini = 0 (pure). Right (2 Yes, 4 No): 1 − (1/3)² − (2/3)² = 0.444. Weighted = (4/10)(0) + (6/10)(0.444) = <b>0.267</b>. Gain = 0.48 − 0.267 = <b>0.213</b>: a good question, because it produced one pure group.</p>
+<p><b>3.</b> (a) Overcast → <b>Yes</b>. (b) Sunny with High humidity → <b>No</b>. (c) Rain with Strong wind → <b>No</b>.</p>
+<p><b>4.</b> Depth 1 leaves errors; depth 2 or 3 should reach 100% on this small dataset (each of the three Outlook branches needs at most one more question). The tree at depth "None" cannot do better than 100% but risks memorising on bigger noisy data.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/decision-tree.js"></script>
+</body>
+</html>

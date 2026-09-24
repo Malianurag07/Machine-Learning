@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Propagation · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="lprop">
+<article id="lesson">
+
+<h1>Label Propagation</h1>
+<p class="lede">Labels are expensive: someone has to look at each image, read each document, diagnose each patient. Unlabelled data is cheap and plentiful. Semi-supervised learning uses a <em>few</em> labelled examples together with <em>many</em> unlabelled ones. Label propagation does it by letting the labels <strong>flow from the labelled points to their neighbours</strong>, along the shape of the data.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 70 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: labels that spread</h2>
+<div class="callout analogy"><p><strong>Dye in a network of pipes.</strong> Imagine every data point is a junction, joined to nearby points by pipes (short pipes are wide, long ones are thin). A few junctions are <em>taps</em> that are fixed open: some pour red dye, some pour blue dye. All other junctions start clear. The dye flows through the pipes and mixes at each junction. After a while every junction has a stable colour mix, and you name it after the colour that dominates. Junctions close to a red tap, or connected to it by many strong pipes, turn red; the ones nearer the blue tap turn blue. Nobody had to label them.</p></div>
+<h3>Why should this work? Three assumptions</h3>
+<p>Using unlabelled data is only useful if the <em>shape</em> of the data tells you something about the labels. The usual assumptions:</p>
+<div class="tw"><table>
+<tr><th>Assumption</th><th>In words</th></tr>
+<tr><td><strong>Smoothness</strong></td><td>points that are close to each other tend to have the same label</td></tr>
+<tr><td><strong>Cluster</strong></td><td>points in the same cluster tend to share a label</td></tr>
+<tr><td><strong>Low-density separation (manifold)</strong></td><td>the boundary between classes runs through empty space, not through the middle of a crowd; classes can be curved shapes and the label should follow the curve</td></tr>
+</table></div>
+<p>When they hold, the unlabelled points reveal where the classes are, and the labelled points just name them. When they do not (classes that overlap heavily), the unlabelled data cannot help, and can even mislead.</p>
+<p>Label propagation is <strong>transductive</strong>: it labels the specific unlabelled points you gave it (though scikit-learn also lets you classify new points by attaching them to the same graph).</p>
+
+<h2>2. The algorithm</h2>
+<ol>
+<li><strong>Build a similarity graph.</strong> Every point is a node. The <em>weight</em> between two points measures how similar they are: close points get a large weight, distant points a tiny one. Two common choices:
+<ul>
+<li><b>RBF (Gaussian) kernel:</b> weight = e<sup>−γ × (distance)²</sup>. Very close → weight near 1; far apart → near 0. The number γ (gamma) sets how quickly the weight falls off.</li>
+<li><b>k nearest neighbours:</b> weight 1 between a point and its k nearest points, 0 otherwise (a sparser, cheaper graph).</li>
+</ul></li>
+<li><strong>Make each row of weights add up to 1</strong>: divide every weight by the total weight of that point. Now a point's row says: "this share of my influence comes from that neighbour" (this is the <em>transition matrix</em> T).</li>
+<li><strong>Give every point a label distribution</strong>: for a labelled point, 100% on its class; for an unlabelled point, nothing yet (all zeros).</li>
+<li><strong>Repeat until nothing changes:</strong> (a) each point's new distribution is the <strong>weighted average of its neighbours' distributions</strong>; (b) <strong>clamp:</strong> reset the labelled points to their original labels (the taps stay open); (c) rescale each row to add up to 1.</li>
+<li><strong>Predict:</strong> the class with the largest share in a point's final distribution.</li>
+</ol>
+<p>The clamping in step 4 is essential: without it, all labels would blur together into one flat average. With it, the labelled points act as fixed "sources", and the result does not depend on how the unlabelled points were initialised: the process always converges to the same answer.</p>
+
+<h3>By hand: a chain of four points</h3>
+<p>Four points in a row, joined by pipes with weights 2, 1 and 1: <b>A — (2) — P — (1) — Q — (1) — B</b>. The end points are labelled: A is class A (100%), B is class B (0% class A). P and Q are unlabelled. Write p for "the share of class A". A point's new share is the weighted average of its neighbours' shares.</p>
+<div class="callout math">
+<p><strong>The update rules.</strong> P has two neighbours: A with weight 2 and Q with weight 1. So P's new share = (2 × share of A + 1 × share of Q) ÷ 3. Q has neighbours P (weight 1) and B (weight 1): Q's new share = (1 × share of P + 1 × share of B) ÷ 2. The labelled points are reset to 1 and 0 every time.</p>
+<p><strong>Iterations</strong> (all shares of P and Q start at 0; each update uses the values from the previous round):</p>
+<div class="tw"><table>
+<tr><th>Iteration</th><th class="num">share of class A at P</th><th class="num">share at Q</th></tr>
+<tr><td>0 (start)</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>1</td><td class="num">(2 × 1 + 0) ÷ 3 = 0.667</td><td class="num">(0 + 0) ÷ 2 = 0</td></tr>
+<tr><td>2</td><td class="num">(2 + 0) ÷ 3 = 0.667</td><td class="num">(0.667 + 0) ÷ 2 = 0.333</td></tr>
+<tr><td>3</td><td class="num">(2 + 0.333) ÷ 3 = 0.778</td><td class="num">(0.667 + 0) ÷ 2 = 0.333</td></tr>
+<tr><td>4</td><td class="num">(2 + 0.333) ÷ 3 = 0.778</td><td class="num">(0.778 + 0) ÷ 2 = 0.389</td></tr>
+<tr><td>5</td><td class="num">0.796</td><td class="num">0.389</td></tr>
+<tr><td>6</td><td class="num">0.796</td><td class="num">0.398</td></tr>
+<tr><td>7</td><td class="num">0.799</td><td class="num">0.398</td></tr>
+<tr><td>8</td><td class="num">0.799</td><td class="num">0.400</td></tr>
+</table></div>
+<p><strong>Where it settles.</strong> At the end the numbers stop changing, so they satisfy both rules at once: P = (2 + Q) ÷ 3 and Q = P ÷ 2. Substitute the second into the first: P = (2 + P ÷ 2) ÷ 3, so 3P = 2 + 0.5P, 2.5P = 2, <b>P = 0.8</b>, and then <b>Q = 0.4</b>. So P is 80% class A: predicted <b>A</b>. Q is only 40% class A: predicted <b>B</b>.</p></div>
+<p>Notice how the strong pipe (weight 2) between A and P pulls P towards A, while Q, halfway between P and B with equal ties, ends up leaning towards B. Change the weights and iterate yourself:</p>
+<div class="demo" data-title="Labels flowing along a chain" id="demo-chain">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>For the curious: the direct solution.</strong> Repeating the update forever converges to a fixed answer, which can also be computed in one step by solving a system of linear equations (as we just did with two unknowns). Label propagation is therefore not a random or approximate process: it gives the unique "harmonic" labelling where each unlabelled point's value is exactly the weighted average of its neighbours'. In scikit-learn it is computed by iterating, and stops when the change falls below <code>tol</code> or <code>max_iter</code> is reached.</p></div>
+
+<h2>3. In two dimensions</h2>
+<p>Here are two half-moons of 100 points each. Only <b>one point per class</b> is labelled (the ringed points). On the left, the simplest supervised rule: every point copies the label of its nearest labelled point, which cuts the plane in half along a straight line and is wrong for much of each moon. On the right, label propagation: press the iteration slider up from 0 and watch the labels creep along each moon, staying inside the crescent because that is where the connected points are.</p>
+<div class="demo" data-title="Two labels, two hundred points" id="demo-spread">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>Drag <b>Iterations</b> from 0 to 150: at first only points close to the ringed ones are coloured; later the colours have reached the ends of both moons.</li>
+<li><b>Circles:</b> one class is a ring around the other; nearest-labelled-point cannot separate them at all, but the labels flow round each ring.</li>
+<li><b>Overlapping blobs:</b> no clean gap between the classes, so the extra points give little, and with only a couple of labels propagation can even do <em>worse</em> than the simple nearest-labelled rule.</li>
+<li><b>Graph settings</b> matter a lot (next section): on the moons, try the RBF width γ at 1 or 2 (labels leak everywhere: about 50% in my tries), then at 20 (usually 99 to 100%), and at 100 (usually fine, but sometimes the graph breaks into islands). A kNN graph with k = 3 left gaps (72% in one try), while k = 5 to 10 gave 100%.</li>
+<li>Press "New labelled points" several times to see how much the outcome depends on <em>which</em> few points were labelled: with an unlucky pair (for example one at the very tip of a moon) even a good γ can give only about 68%.</li>
+</ul>
+
+<h2>4. Choosing the graph</h2>
+<p>The graph is the model. Its settings decide how far and along which paths a label may travel.</p>
+<div class="tw"><table>
+<tr><th>Setting</th><th>Too small</th><th>Too large</th></tr>
+<tr><td><b>RBF γ</b> (large γ = narrow reach)</td><td>γ tiny: every point is strongly linked to <em>everything</em>, including the other class: labels leak everywhere and everything ends up looking alike.</td><td>γ huge: points are linked only to their very closest neighbours; islands become disconnected and labels cannot reach them.</td></tr>
+<tr><td><b>kNN k</b></td><td>k small: gaps in the graph, labels get stuck; slow convergence.</td><td>k large: shortcuts between the classes (a link between a point of one moon and a point of the other lets the wrong label through).</td></tr>
+</table></div>
+<p>On 200 points from two half-moons with <b>2 labelled points per class</b>, I measured the accuracy on the unlabelled points in scikit-learn for several RBF widths (average of 10 random choices of the labelled points): γ = 1 → <b>66%</b>, γ = 5 → <b>85%</b>, γ = 20 → <b>99%</b>, γ = 100 → <b>100%</b>. A poor γ is a bad model, and a good one is nearly perfect. With a kNN graph (k = 7) the same problem gave 86% (average of 30 draws): kNN graphs are cheaper but need care. The distances also depend on the units of your features: <strong>scale the features first</strong>, as in every distance-based method.</p>
+<p>The next demo shows how much the labels help as their number grows. Each point is the average of 8 random choices of the labelled points.</p>
+<div class="demo" data-title="How many labels do we need?" id="demo-curve">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>5. Label propagation in scikit-learn</h2>
+<p>Unlabelled points are marked with <code>-1</code> in the label array. All figures below come from an actual run with scikit-learn 1.9.0 (other versions and random seeds will differ a little).</p>
+<pre class="code">
+import numpy as np
+from sklearn.datasets import make_moons
+from sklearn.semi_supervised import LabelPropagation
+
+X, y = make_moons(200, noise=0.08, random_state=0)
+
+rng = np.random.RandomState(0)
+labelled = np.r_[rng.choice(np.where(y == 0)[0], 2, replace=False),
+                 rng.choice(np.where(y == 1)[0], 2, replace=False)]     # only 4 labelled points
+y_partial = -np.ones(len(y), dtype=int)                                  # -1 means "unlabelled"
+y_partial[labelled] = y[labelled]
+
+model = LabelPropagation(kernel="rbf", gamma=20).fit(X, y_partial)
+unlabelled = np.setdiff1d(np.arange(len(y)), labelled)
+print((model.transduction_[unlabelled] == y[unlabelled]).mean())    # 1.0 in this run (the average over 10 different random draws of the 4 labels was 0.994)
+# model.transduction_ : the label the algorithm assigned to EVERY training point
+# model.label_distributions_ : the final class shares of each point (rows add up to 1)
+# model.n_iter_ : how many iterations it needed
+</pre>
+<p>A realistic example: the handwritten-digits images (1797 images of 8 × 8 pixels, 10 classes), where we pretend that only <b>50 images</b> (5 per digit) are labelled. Compare with supervised models that see only those 50 labelled images:</p>
+<pre class="code">
+from sklearn.datasets import load_digits
+from sklearn.semi_supervised import LabelPropagation, LabelSpreading
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+
+X, y = load_digits(return_X_y=True)
+X = X / 16.0                                             # scale the pixel values to 0..1
+
+idx = np.concatenate([np.random.RandomState(0).choice(np.where(y == d)[0], 5, replace=False) for d in range(10)])
+y_partial = -np.ones(len(y), dtype=int); y_partial[idx] = y[idx]
+rest = np.setdiff1d(np.arange(len(y)), idx)
+
+lp = LabelPropagation(kernel="knn", n_neighbors=7, max_iter=2000).fit(X, y_partial)
+print((lp.transduction_[rest] == y[rest]).mean())                # 0.890 for this particular choice of 50 labelled images
+# averages over 10 different random choices of the 50 labelled images:
+#   LabelPropagation (kNN graph, k=7)    0.918
+#   LabelSpreading   (next lesson)       0.922
+#   1-nearest-neighbour, labelled only   0.854
+#   logistic regression, labelled only   0.854
+# and with just 10 labelled images (1 per digit, 5 draws): propagation 0.789 vs 1-NN 0.646
+</pre>
+<p>With 50 labels the unlabelled images lift the accuracy from about 85% to about 92%; with only 10 labels the lift is bigger (65% to 79%). (Note: the default RBF kernel of <code>LabelPropagation</code> uses <code>gamma=20</code>, which gave 85% on digits in one run: the defaults are not always right, so tune <code>gamma</code> or <code>n_neighbors</code>.)</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>kernel</code></td><td><code>"rbf"</code> (default) or <code>"knn"</code>, or a function returning a graph.</td></tr>
+<tr><td><code>gamma</code></td><td>Width of the RBF kernel (default 20). Larger = narrower reach.</td></tr>
+<tr><td><code>n_neighbors</code></td><td>k for the kNN kernel (default 7).</td></tr>
+<tr><td><code>max_iter</code>, <code>tol</code></td><td>At most this many iterations (default 1000), stopping when the change is below <code>tol</code> (default 0.001). A warning is raised when the algorithm has not converged: increase <code>max_iter</code>.</td></tr>
+<tr><td><code>transduction_</code></td><td>The predicted label for every training point (labelled and unlabelled).</td></tr>
+<tr><td><code>label_distributions_</code>, <code>classes_</code>, <code>n_iter_</code></td><td>Final class shares per point, the class names, and the iterations used.</td></tr>
+<tr><td><code>predict</code>, <code>predict_proba</code></td><td>Classify new points by attaching them to the graph.</td></tr>
+<tr><td><code>SelfTrainingClassifier</code></td><td>A different semi-supervised approach in the same module: train any classifier on the labelled points, label the unlabelled ones it is most confident about, add them and retrain ("pseudo-labelling").</td></tr>
+</table></div>
+
+<h2>6. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Gets much more from very few labels by using the unlabelled data's shape</td><td>Depends on the assumptions: classes must form clusters or manifolds separated by gaps</td></tr>
+<tr><td>Simple, few settings, gives class probabilities</td><td>Sensitive to the graph settings (γ or k) and to feature scaling</td></tr>
+<tr><td>Follows curved classes that a plain nearest-neighbour rule cannot</td><td>Labels are <b>clamped</b>: a wrongly labelled point spreads its mistake (Label Spreading, next, softens this)</td></tr>
+<tr><td>Deterministic, no training in the usual sense</td><td>The RBF graph needs memory of order n² and time that grows quickly: for large data use kNN graphs</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>📄 Web pages and documents</h4><p>Classify a huge web crawl or document archive when only a few hundred pages have been labelled by hand.</p></div>
+<div class="card"><h4>🧬 Protein and gene function</h4><p>Only a few proteins have known functions; similarity networks between proteins let labels flow to the rest.</p></div>
+<div class="card"><h4>🩻 Medical imaging</h4><p>Radiologists label a small subset of scans; the propagation labels similar scans, to be checked by a person.</p></div>
+<div class="card"><h4>🕵️ Fraud and abuse detection</h4><p>Few confirmed cases, millions of accounts: link accounts by shared devices or behaviour and let "fraud" spread through the graph.</p></div>
+<div class="card"><h4>🖼️ Image collections</h4><p>Tag a photo library from a handful of tagged photos by following visual similarity.</p></div>
+<div class="card"><h4>👥 Social networks</h4><p>Infer interests or communities of users from the few who declared them, along friendship links (the graph exists already).</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Semi-supervised learning</strong> uses a few labelled points plus many unlabelled ones. It works when nearby points share labels and classes form clusters or curved manifolds with gaps between them.</li>
+<li><strong>Label propagation</strong> builds a similarity graph (RBF or kNN), then repeatedly replaces each point's label distribution by the <b>weighted average of its neighbours'</b>, <b>clamping</b> the labelled points, until it converges. The prediction is the largest share.</li>
+<li>In our chain example the iterations 0.667 → 0.778 → 0.796 → 0.799 converge to the exact solution <b>0.8 and 0.4</b> (P → class A, Q → class B).</li>
+<li>The <b>graph settings</b> (γ or k) are decisive: on two moons with 2 labels per class, accuracy ranged from 66% (γ = 1) to 99% (γ = 20). Scale the features first.</li>
+<li>On digits, 50 labels plus the unlabelled images gave about 92% versus about 85% for supervised models on the 50 labels alone. The fewer labels, the bigger the gain.</li>
+<li>Limits: clamping propagates label mistakes, overlapping classes give little help, and big RBF graphs are expensive.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>A chain A — U — B has weights 1 (A–U) and 1 (U–B); A is labelled class A (share 1), B is labelled class B (share 0). What share of class A does U end up with? What if the weight A–U is 3 and U–B is 1?</li>
+<li>In the lesson's chain (weights 2, 1, 1), compute iteration 3 for P and Q from iteration 2 (0.667 and 0.333).</li>
+<li>Why must the labelled points be clamped (reset each iteration)?</li>
+<li>Digits with 50 labels: by how many percentage points did label propagation beat the supervised models?</li>
+<li>Bonus: run the moons code with <code>gamma=1</code>, <code>5</code>, <code>20</code>. Which is best, and why does a small gamma hurt?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> U = (1 × 1 + 1 × 0) ÷ 2 = <b>0.5</b>: a tie (it is equally tied to both). With weights 3 and 1: U = (3 × 1 + 1 × 0) ÷ 4 = <b>0.75</b> → class A.</p>
+<p><b>2.</b> P = (2 × 1 + 1 × 0.333) ÷ 3 = 2.333 ÷ 3 = <b>0.778</b>. Q = (1 × 0.667 + 1 × 0) ÷ 2 = <b>0.333</b> (it uses P's previous value, 0.667).</p>
+<p><b>3.</b> Without clamping, the average would also be applied to the labelled points, and the information would dilute: after enough iterations everything would converge to the same flat mixture. Clamping keeps the known labels fixed as sources that the rest must respect.</p>
+<p><b>4.</b> About 91.8% versus 85.4%: <b>roughly 6 percentage points</b> (average over 10 random label choices).</p>
+<p><b>5.</b> In my run (average of 10 draws, 2 labels per class): gamma 1 gave about 66%, gamma 5 about 85%, gamma 20 about 99%. A small gamma makes every point strongly connected to far-away points, including the other moon, so labels leak between the classes and the answer becomes a blur.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/label-propagation.js"></script>
+</body>
+</html>

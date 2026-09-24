@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment using Streamlit · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="streamlit">
+<article id="lesson">
+
+<h1>Deployment using Streamlit</h1>
+<p class="lede"><strong>Streamlit</strong> turns an ordinary Python script into an interactive web app, with no HTML, CSS or JavaScript to write. For machine learning it is the fastest way to let a person <em>try</em> a model: move some sliders, press a button, see the prediction. This lesson explains the one idea that makes Streamlit different (the script re-runs from the top on every click), then builds a complete prediction app around the saved iris model from the previous lesson.</p>
+<div class="meta"><span class="chip">Practical</span><span class="chip plain">≈ 90 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. The big idea: a script that re-runs</h2>
+<div class="callout analogy"><p><strong>The whiteboard that is wiped clean.</strong> Imagine a teacher who, every time a student changes one number on the board, wipes the <em>whole</em> board and redoes the entire worked example from line 1 with the new number. It is slow in theory but wonderfully simple: the teacher never has to think about "what changed?", the board always shows a picture that matches the current numbers. Streamlit works this way. Whenever you touch a widget, Streamlit runs your Python file again from the first line to the last and redraws the page. Your code stays a plain top-to-bottom script.</p></div>
+<p>That single rule explains almost everything else in this lesson:</p>
+<ul>
+<li>A normal variable is <strong>forgotten</strong> after each run (the script starts over), so you need <strong>session state</strong> to remember things.</li>
+<li>Expensive work (loading a model, reading a big file) would be repeated on every click, so you need <strong>caching</strong>.</li>
+<li>A widget is not an event handler you register: <code>st.slider(...)</code> is simply a function that <em>returns the current value</em> of the slider each time the script runs.</li>
+</ul>
+<p>Watch one script run. Choose what the user does and step through it:</p>
+<div class="demo" data-title="What runs when you touch a widget?" id="demo-rerun">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>2. The smallest app</h2>
+<p>Install Streamlit, save a file, run it. I ran everything in this lesson with <b>Streamlit 1.64.0</b>, scikit-learn 1.9.0, joblib 1.5.3 and pandas 3.0.6. I tested the code headlessly with Streamlit's own test tool (<code>streamlit.testing.v1.AppTest</code>), which runs the script and lets you "click" widgets from Python. I did <em>not</em> open a browser on the real Streamlit server, so how the pages look in the browser is described from the documentation, not from my own screen.</p>
+<pre class="code">
+# hello.py
+import streamlit as st
+
+n = st.slider("Pick a number", 0, 10, 3)      # returns the slider's current value
+st.write("Its square is", n * n)
+
+# terminal:   pip install streamlit
+#             streamlit run hello.py          # opens http://localhost:8501
+</pre>
+<p>Move the slider and the text updates: the script just ran again with the new value of <code>n</code>. There is no callback and no page template.</p>
+
+<h2>3. Widgets: how the user gives input</h2>
+<div class="tw"><table>
+<tr><th>Widget</th><th>Returns</th><th>Typical ML use</th></tr>
+<tr><td><code>st.slider(label, min, max, value, step)</code></td><td>a number (or a pair)</td><td>a numeric feature, a threshold</td></tr>
+<tr><td><code>st.number_input(...)</code></td><td>a number</td><td>an exact value such as an age</td></tr>
+<tr><td><code>st.selectbox(label, options)</code></td><td>the chosen item</td><td>a categorical feature, choosing a model</td></tr>
+<tr><td><code>st.radio</code>, <code>st.checkbox</code>, <code>st.toggle</code></td><td>item / <code>True</code>-<code>False</code></td><td>options, switches</td></tr>
+<tr><td><code>st.text_input</code>, <code>st.text_area</code></td><td>a string</td><td>text for a classifier</td></tr>
+<tr><td><code>st.file_uploader("CSV", type="csv")</code></td><td>a file object (or <code>None</code>)</td><td>score a whole CSV (batch prediction)</td></tr>
+<tr><td><code>st.button("Predict")</code></td><td><code>True</code> only on the run right after the click, otherwise <code>False</code></td><td>"run the model now"</td></tr>
+</table></div>
+<p>Output is just as direct: <code>st.write</code> (shows almost anything), <code>st.metric</code> (a big number with a change), <code>st.dataframe</code> (a table), <code>st.bar_chart</code> / <code>st.line_chart</code> (quick charts, or pass a Matplotlib figure to <code>st.pyplot</code>), and the message boxes <code>st.success</code>, <code>st.warning</code>, <code>st.error</code>.</p>
+<div class="callout warn"><p><strong>The button surprise.</strong> <code>st.button</code> is <code>True</code> for exactly <em>one</em> run. In my test app, I pressed Predict and the result appeared; I then moved a slider (a new run, in which the button is <code>False</code> again) and the result <b>disappeared</b> (0 metrics on the page). If that is not what you want, store the result in <code>st.session_state</code> (section 5) or use a form (section 6).</p></div>
+
+<h2>4. Caching: do not repeat expensive work</h2>
+<p>Because the whole script re-runs on every touch, a line such as <code>joblib.load("model.joblib")</code> at the top would reload the model on every slider move. Streamlit has two decorators for this. The first time the function runs with certain inputs, the result is stored; the next time it is called with the same inputs, Streamlit returns the stored result instead of running the function.</p>
+<div class="tw"><table>
+<tr><th>Decorator</th><th>Use it for</th><th>What you get back</th></tr>
+<tr><td><code>@st.cache_data</code></td><td>data: a loaded CSV, a query result, a computed table</td><td>a <em>copy</em> of the stored value each time (safe to change)</td></tr>
+<tr><td><code>@st.cache_resource</code></td><td>things you do not copy: a trained model, a database connection</td><td>the <em>same shared object</em> every time, for all users</td></tr>
+</table></div>
+<p>A real measurement (Streamlit 1.64.0, a function that sleeps one second, called with the same input): the first run took <b>1.00 s</b> and the second <b>0.00 s</b>. Streamlit's own debug log printed "Memory cache MISS" on the first run and "Memory cache HIT" on the second. Try the idea:</p>
+<div class="demo" data-title="Caching: hit or miss?" id="demo-cache">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Two practical notes. The cache key is built from the function's arguments (and its code), so a <em>different</em> argument is a miss. And <code>@st.cache_data(ttl=3600)</code> makes stored results expire after an hour, useful when the underlying data changes.</p>
+
+<h2>5. Session state: remembering between runs</h2>
+<p>Each browser tab has its own <code>st.session_state</code>, a dictionary that survives reruns. Everything else (ordinary variables) starts again. I ran this tiny app and clicked "add" three times:</p>
+<pre class="code">
+import streamlit as st
+count = 0                                   # a plain variable: recreated as 0 on every run
+if "n" not in st.session_state:             # create the remembered value only once
+    st.session_state.n = 0
+if st.button("add"):
+    count += 1
+    st.session_state.n += 1
+st.write("plain", count, "state", st.session_state.n)
+</pre>
+<p>Real output after each click: <code>plain 1 state 1</code>, then <code>plain 1 state 2</code>, then <code>plain 1 state 3</code>; and on a run with no click, <code>plain 0 state 3</code>. The plain variable is always reset; session state keeps its value.</p>
+<div class="demo" data-title="Plain variable vs session state" id="demo-state">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p><strong>Callbacks.</strong> A widget can call a function <em>before</em> the rerun starts: <code>st.button("bump", on_click=bump)</code>. This is the tidy way to update state. (In my test, clicking a button wired this way changed the stored total from 0 to 1.) Give a widget a <code>key="name"</code> and its value is also available as <code>st.session_state["name"]</code>.</p>
+<p><strong>Session state is per tab, not per server.</strong> Two people using the app have separate session states, but they share anything stored with <code>@st.cache_resource</code>. Do not keep one user's data in a cached object.</p>
+
+<h2>6. Layout: making it look organised</h2>
+<div class="tw"><table>
+<tr><th>Tool</th><th>Purpose</th></tr>
+<tr><td><code>st.sidebar</code> / <code>with st.sidebar:</code></td><td>a side panel for the inputs, leaving the main area for results</td></tr>
+<tr><td><code>st.columns(2)</code></td><td>side-by-side blocks (for example a metric next to a chart)</td></tr>
+<tr><td><code>st.tabs(["History", "Data"])</code></td><td>tabbed sections</td></tr>
+<tr><td><code>st.expander("Details")</code></td><td>a collapsible box for extras</td></tr>
+<tr><td><code>st.form("f")</code> + <code>st.form_submit_button</code></td><td>group several inputs so the script re-runs <em>once</em>, when the form is submitted, not on every widget change (as the Streamlit documentation describes; my headless test cannot show the browser behaviour, so I did not verify this part myself)</td></tr>
+<tr><td><code>st.set_page_config(page_title=..., layout="wide")</code></td><td>must be the first Streamlit call in the script</td></tr>
+</table></div>
+
+<h2>7. A complete prediction app</h2>
+<p>Now everything together. This app loads the saved <code>iris_model.joblib</code> (the pipeline from the previous lesson: a scaler and a logistic regression, test accuracy 0.9211), takes four measurements from the sidebar, predicts on demand, shows the probabilities, warns when an input is outside the range of the training data, and keeps a history. I ran it with <code>AppTest</code>.</p>
+<pre class="code">
+# app.py
+import joblib
+import pandas as pd
+import streamlit as st
+
+st.set_page_config(page_title="Iris predictor", page_icon="🌸", layout="wide")
+
+CLASSES = ["setosa", "versicolor", "virginica"]
+FEATURES = ["sepal length (cm)", "sepal width (cm)", "petal length (cm)", "petal width (cm)"]
+
+
+@st.cache_resource                       # load the model ONCE per server, share it between reruns and users
+def load_model():
+    return joblib.load("iris_model.joblib")
+
+
+@st.cache_data                           # cache plain data: the same inputs return the stored answer
+def load_reference():
+    from sklearn.datasets import load_iris
+    d = load_iris(as_frame=True)
+    return d.frame.rename(columns=dict(zip(d.feature_names, FEATURES)))
+
+
+model = load_model()
+
+if "history" not in st.session_state:   # session_state survives reruns (one per browser tab)
+    st.session_state.history = []
+
+st.title("🌸 Iris species predictor")
+st.write("Move the sliders in the sidebar, then press **Predict**.")
+
+with st.sidebar:
+    st.header("Flower measurements")
+    sl = st.slider(FEATURES[0], 4.0, 8.0, 5.8, 0.1)
+    sw = st.slider(FEATURES[1], 2.0, 4.5, 3.0, 0.1)
+    pl = st.slider(FEATURES[2], 1.0, 7.0, 4.3, 0.1)
+    pw = st.slider(FEATURES[3], 0.1, 2.5, 1.3, 0.1)
+    go = st.button("Predict", type="primary")
+
+if go:
+    row = pd.DataFrame([[sl, sw, pl, pw]], columns=FEATURES)
+    proba = model.predict_proba(row.values)[0]
+    k = int(proba.argmax())
+    st.session_state.history.append({"species": CLASSES[k], "probability": round(float(proba[k]), 3)})
+
+    left, right = st.columns(2)
+    left.metric("Predicted species", CLASSES[k], f"{proba[k]:.1%} confident")
+    right.bar_chart(pd.Series(proba, index=CLASSES, name="probability"))
+
+    ref = load_reference()
+    lo, hi = ref[FEATURES].min(), ref[FEATURES].max()
+    outside = [f for f, v in zip(FEATURES, [sl, sw, pl, pw]) if not lo[f] &lt;= v &lt;= hi[f]]
+    if outside:
+        st.warning("Outside the range of the training data: " + ", ".join(outside))
+
+tab1, tab2 = st.tabs(["History", "Training data"])
+with tab1:
+    st.dataframe(pd.DataFrame(st.session_state.history))
+with tab2:
+    st.dataframe(load_reference().head(10))
+</pre>
+<p>What happened when I drove it with <code>AppTest</code> (set the sliders, click Predict, read the page):</p>
+<pre class="code">
+first load                              -> no exceptions, 4 sliders, 1 button, 2 tabs
+sliders 5.1, 3.5, 1.4, 0.2 + Predict    -> metric "setosa", "98.1% confident"
+sliders 6.7, 3.0, 5.2, 2.3 + Predict    -> metric "virginica", "95.3% confident"     (history now has 2 rows)
+sliders 8.0, 3.0, 7.0, 2.5 + Predict    -> "virginica", "99.8% confident" and the warning
+                                           "Outside the range of the training data: sepal length (cm), petal length (cm)"
+move one slider, no click               -> the result is gone (button is False on that run); history still has 3 rows
+</pre>
+<p>These are exactly the same probabilities as the FastAPI service gave in the previous lesson (98.1% and 95.3%), because both load the same saved pipeline. The third case repeats the lesson from the API: the model is 99.8% "confident" about a flower far outside anything it was trained on, so the app shows the warning. A friendly interface makes an over-confident model <em>more</em> convincing, so range checks matter here too.</p>
+<p>Below is a faithful in-page copy of this app. It uses the real iris coefficients of the saved model, so the numbers match the table above. (It is a JavaScript re-implementation for teaching; the real app runs Python on a server.)</p>
+<div class="demo" data-title="The iris app, in your browser" id="demo-app">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>8. Running it and sharing it</h2>
+<h3>Run it locally</h3>
+<pre class="code">
+python -m venv .venv                     # optional but recommended: an isolated environment
+pip install streamlit scikit-learn joblib pandas
+streamlit run app.py                     # then open http://localhost:8501 (the default port)
+</pre>
+<p>Keep <code>app.py</code> and <code>iris_model.joblib</code> in the same folder, because the app loads the model with a relative path. When you save <code>app.py</code>, Streamlit offers to rerun the app with your new code.</p>
+<h3>Deploy it</h3>
+<p>These are the usual routes. I describe them from general knowledge of the platforms; I have not deployed this app to any of them, so check the current documentation before you rely on the details.</p>
+<div class="tw"><table>
+<tr><th>Option</th><th>How</th><th>Good for</th></tr>
+<tr><td><strong>Streamlit Community Cloud</strong></td><td>put <code>app.py</code>, the model file and a <code>requirements.txt</code> in a GitHub repository, then point the service at that repository</td><td>free public demos and portfolios; small apps</td></tr>
+<tr><td><strong>Hugging Face Spaces</strong></td><td>a Space that runs a Streamlit (or Docker) app from a repository</td><td>sharing ML demos with the community</td></tr>
+<tr><td><strong>Docker on any cloud</strong></td><td>a container running <code>streamlit run</code>, on a cloud VM or a container service</td><td>private or company apps with your own rules</td></tr>
+<tr><td><strong>An internal server</strong></td><td>run it on a company machine behind the company network and login</td><td>internal tools, sensitive data</td></tr>
+</table></div>
+<p>A starting <code>requirements.txt</code>, with the versions I used (pin your own):</p>
+<pre class="code">
+streamlit==1.64.0
+scikit-learn==1.9.0
+joblib==1.5.3
+pandas==3.0.6
+</pre>
+<p>And a template <code>Dockerfile</code> (not run by me: treat it as a standard starting point to test yourself):</p>
+<pre class="code">
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py iris_model.joblib ./
+EXPOSE 8501
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+</pre>
+<p><strong>Secrets.</strong> Never put passwords or API keys in the code. Streamlit reads them from a <code>.streamlit/secrets.toml</code> file (kept out of your repository) and exposes them as <code>st.secrets["name"]</code>; hosting platforms have a settings page for the same purpose.</p>
+
+<h2>9. Streamlit or FastAPI?</h2>
+<p>They solve different problems and often work together:</p>
+<div class="tw"><table>
+<tr><th></th><th>Streamlit</th><th>FastAPI (previous lesson)</th></tr>
+<tr><td>Who uses it</td><td>a <em>person</em> at a browser</td><td>another <em>program</em></td></tr>
+<tr><td>Output</td><td>a web page</td><td>JSON</td></tr>
+<tr><td>Effort</td><td>very low: one Python file</td><td>a little more: schemas, endpoints</td></tr>
+<tr><td>Scale</td><td>runs the script per user session; fine for small groups</td><td>built to serve many automated requests</td></tr>
+<tr><td>Best for</td><td>demos, internal tools, what-if explorers</td><td>production systems, apps and back ends</td></tr>
+</table></div>
+<p>A common pattern: the real product calls a FastAPI model service, while a Streamlit app (built quickly for analysts) calls the same service or loads the same saved pipeline.</p>
+
+<h2>10. Common pitfalls</h2>
+<div class="tw"><table>
+<tr><th>Pitfall</th><th>Why it happens</th><th>Fix</th></tr>
+<tr><td>The model reloads on every click and the app feels slow</td><td>loading is outside a cache; the script re-runs from the top</td><td><code>@st.cache_resource</code> on the loader</td></tr>
+<tr><td>A variable "forgets" its value</td><td>plain variables reset every run (demo above)</td><td><code>st.session_state</code></td></tr>
+<tr><td>The result vanishes when a slider moves</td><td><code>st.button</code> is <code>True</code> for one run only</td><td>store the result in session state, or use a form</td></tr>
+<tr><td>Training the model inside the app</td><td>training re-runs on every interaction and takes minutes</td><td>train offline, save the pipeline, only <em>load</em> it in the app</td></tr>
+<tr><td>Wrong feature order or scaling</td><td>the app builds inputs differently from training</td><td>save the whole <code>Pipeline</code>, pass a DataFrame with the training column names, test with known rows</td></tr>
+<tr><td>File not found on the server</td><td>relative paths differ from your laptop</td><td>keep the model in the repository and build paths from <code>__file__</code> (<code>pathlib.Path(__file__).parent</code>)</td></tr>
+<tr><td>One user's data leaks to another</td><td>user data stored in a <code>cache_resource</code> object (shared by everyone)</td><td>keep per-user data in session state</td></tr>
+<tr><td>Overconfident answers on odd inputs</td><td>the model extrapolates (99.8% in my test)</td><td>range checks and warnings, as in the app</td></tr>
+<tr><td>Unknown pickles</td><td>loading a model file can run code</td><td>only load files you made or trust (see the previous lesson)</td></tr>
+<tr><td>Wrong package versions online</td><td>the server installs whatever <code>requirements.txt</code> says</td><td>pin versions to match the environment that trained the model</td></tr>
+</table></div>
+<p>Also remember the limits: Streamlit reruns a script per session, so it is <strong>not</strong> a substitute for a scalable, secured production service, and it does not give you login or permissions by itself.</p>
+
+<h2>11. Real-world use</h2>
+<div class="cards">
+<div class="card"><h4>📊 Analyst what-if tools</h4><p>A business team changes price, region or season and instantly sees the forecast, without writing code.</p></div>
+<div class="card"><h4>🎬 Stakeholder demos</h4><p>A data scientist shows a working prototype in an afternoon to decide whether the idea deserves a full engineering project.</p></div>
+<div class="card"><h4>🔎 Model explorers</h4><p>Upload a CSV, choose a model, see metrics and charts side by side: a quick way to compare experiments.</p></div>
+<div class="card"><h4>🏥 Internal review tools</h4><p>Experts look at predictions, correct wrong ones and export the corrections as new labelled data.</p></div>
+<div class="card"><h4>🎓 Teaching and portfolios</h4><p>Learners publish a small app so others can try their model with their own inputs.</p></div>
+<div class="card"><h4>🛠️ Monitoring dashboards</h4><p>Plot drift scores and prediction volumes from the logs of a deployed service (previous lesson).</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Streamlit turns a Python script into a web app. <strong>The whole script re-runs, top to bottom, on every interaction</strong>; a widget function just returns the current value.</li>
+<li><strong>Cache</strong> expensive work: <code>@st.cache_resource</code> for the model, <code>@st.cache_data</code> for data. (My test: 1.00 s first call, 0.00 s cached.)</li>
+<li>Ordinary variables reset every run; <strong><code>st.session_state</code></strong> remembers (per browser tab). <code>st.button</code> is only <code>True</code> for one run.</li>
+<li>Organise with the <strong>sidebar, columns, tabs</strong> and forms; show results with <code>st.metric</code>, <code>st.dataframe</code>, charts.</li>
+<li>A good app <strong>loads a saved pipeline</strong> (never trains inside the app), passes inputs in the training order, and warns when inputs are outside the training range.</li>
+<li>Run with <code>streamlit run app.py</code>; deploy through Community Cloud, Hugging Face Spaces or Docker, pin your <code>requirements.txt</code>, keep secrets out of the code.</li>
+<li>Streamlit is for <strong>people</strong> (demos, internal tools); FastAPI is for <strong>programs</strong> (production services). They complement each other.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A script has <code>x = 0</code> at the top and a button that does <code>x += 1</code>. You click the button five times. What does the page show after the fifth click, and why?</li>
+<li>Where would you put the line that loads the model, and which decorator would you use?</li>
+<li>You want the result to stay on screen while the user adjusts sliders. Name two ways.</li>
+<li>Why is it a bad idea to train a model inside the app file?</li>
+<li>Bonus: run the app above (<code>pip install streamlit</code>, save the pipeline from the previous lesson as <code>iris_model.joblib</code>, then <code>streamlit run app.py</code>). Add a <code>st.selectbox</code> that chooses between two saved models.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> It shows <b>1</b> after each click, including the fifth: every click starts a new run of the script, so <code>x</code> is reset to 0 and then increased once. Keep the counter in <code>st.session_state</code> to reach 5 (the demo above shows exactly this).</p>
+<p><b>2.</b> In a small function near the top of the script, decorated with <code>@st.cache_resource</code>, so the model is loaded once and shared, not on every rerun.</p>
+<p><b>3.</b> (a) Save the result in <code>st.session_state</code> when the button is pressed and display it from there; (b) put the sliders and button inside an <code>st.form</code> so the script only re-runs on submit; (c) compute the result without a button at all, so it updates on every slider move (fine when the model is fast).</p>
+<p><b>4.</b> The script re-runs on every interaction, so training would repeat again and again (slow and wasteful), and the result could change between runs. Train once offline, evaluate it properly, save the pipeline, and only load it in the app.</p>
+<p><b>5.</b> For example <code>name = st.selectbox("Model", ["iris_lr.joblib", "iris_rf.joblib"])</code> and a loader <code>@st.cache_resource def load_model(path): return joblib.load(path)</code>. Because the cache key includes the argument, each model file is loaded once and then reused.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/streamlit.js"></script>
+</body>
+</html>

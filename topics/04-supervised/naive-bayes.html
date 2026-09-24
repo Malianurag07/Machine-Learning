@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naïve Bayes · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="nb">
+<article id="lesson">
+
+<h1>Naïve Bayes</h1>
+<p class="lede">Naïve Bayes classifies by playing detective: it weighs every clue, asks "how likely is this evidence if the email is spam, versus if it is not?", and picks the more probable answer. It is fast, tiny, and a classic for text.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 75 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. The big idea</h2>
+<p>Most classifiers learn a boundary. Naïve Bayes takes a different route: it learns <strong>how each class tends to look</strong> ("spam emails often contain the word <em>free</em>; ordinary emails often contain <em>meeting</em>"), and then, given a new email, asks <em>which class would most likely have produced this?</em> The tool for reversing "how does the class look" into "which class is this" is <strong>Bayes' theorem</strong>.</p>
+<div class="callout analogy"><p><strong>The detective.</strong> A detective starts with a hunch based on how common each kind of case is (the <em>prior</em>), then updates it with each clue found at the scene (<em>evidence</em>). A muddy footprint is common among gardeners and rare among bankers, so it shifts suspicion towards gardeners. Naïve Bayes does this with numbers, one clue at a time, and finally names the most likely suspect. It is called <em>naïve</em> because it assumes the clues are independent of each other, which is convenient but not always true.</p></div>
+
+<h2>2. Bayes' theorem in plain words</h2>
+<p>Write P(A | B) for "the probability of A, given that B is true". Bayes' theorem says:</p>
+$$P(\text{class}\mid\text{evidence})=\frac{P(\text{evidence}\mid\text{class})\times P(\text{class})}{P(\text{evidence})}$$
+<div class="tw"><table>
+<tr><th>Name</th><th>Meaning</th><th>Spam example</th></tr>
+<tr><td><strong>Prior</strong> P(class)</td><td>How common is the class <em>before</em> seeing anything?</td><td>40% of all email is spam</td></tr>
+<tr><td><strong>Likelihood</strong> P(evidence | class)</td><td>If the class were true, how likely is this evidence?</td><td>Among spam, 60% contain "free"</td></tr>
+<tr><td><strong>Evidence</strong> P(evidence)</td><td>How common is this evidence overall? (It just makes the answers add up to 100%.)</td><td>How many emails of any kind contain "free"</td></tr>
+<tr><td><strong>Posterior</strong> P(class | evidence)</td><td>What we want: the probability of the class <em>after</em> seeing the evidence.</td><td>Given the email has "free", chance it is spam</td></tr>
+</table></div>
+<p><strong>In words:</strong> posterior = (likelihood × prior) ÷ evidence.</p>
+
+<h3>The surprising medical-test example</h3>
+<p>A disease affects <strong>1%</strong> of people. A test catches it <strong>90%</strong> of the time when it is present (sensitivity), and wrongly says "positive" for <strong>9%</strong> of healthy people (false-positive rate). You test positive. How likely are you to be ill? Most people guess around 90%. The truth is far lower, and the easiest way to see it is to count real people:</p>
+<div class="callout math">
+<p>Take <strong>1,000 people</strong>.
+<br>• 1% are ill = <strong>10</strong> people. The test catches 90% → <strong>9</strong> true positives.
+<br>• 990 are healthy. 9% of them test positive → <strong>89</strong> false positives.
+<br>• So 9 + 89 = 98 people test positive, but only 9 of them are ill: 9 ÷ 98 = <strong>9.2%</strong>.</p>
+<p>Even after a positive test the chance is only about 9%, because the disease is so rare that false alarms outnumber real cases. That is the <em>prior</em> at work. (With Bayes' formula: 0.9 × 0.01 ÷ (0.9 × 0.01 + 0.09 × 0.99) = 0.0917, the same number.)</p></div>
+<div class="demo" data-title="Count the people: why priors matter" id="demo-nf">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--bad)"></i>ill &amp; positive</span><span><i style="background:var(--c5)"></i>healthy &amp; positive (false alarm)</span><span><i style="background:var(--c2)"></i>ill &amp; negative (missed)</span><span><i style="background:var(--surface-2)"></i>healthy &amp; negative</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>3. From one clue to many: the "naïve" step</h2>
+<p>An email has many words, and each is a clue. Ideally we would need P(all these words together | spam), but there are astronomically many word combinations, so we can never collect enough data for that. The <strong>naïve assumption</strong> saves us: <em>pretend the clues are independent given the class</em>. Then the joint likelihood is simply the <strong>product</strong> of the individual ones:</p>
+$$P(\text{spam}\mid w_1,w_2,\dots)\;\propto\;P(\text{spam})\times P(w_1\mid\text{spam})\times P(w_2\mid\text{spam})\times\cdots$$
+<p><strong>In words:</strong> score for a class = its prior × (the chance each word appears in that class), all multiplied together. Do it for each class; the biggest score wins. To get proper probabilities, divide each score by the total of the scores.</p>
+<p>The assumption is rarely true ("free" and "winner" often appear together), which is why it is called naïve, yet the ranking of classes is often still right, and it needs very little data.</p>
+
+<h2>4. Spam filter by hand</h2>
+<p>Here are 8 tiny emails (the vocabulary has only 4 words: <em>free, winner, money, meeting</em>):</p>
+<div class="tw"><table>
+<tr><th>Spam emails</th><th>Ordinary ("ham") emails</th></tr>
+<tr><td>1. free winner</td><td>5. meeting money</td></tr>
+<tr><td>2. free money</td><td>6. meeting</td></tr>
+<tr><td>3. free winner money</td><td>7. free meeting</td></tr>
+<tr><td>4. winner</td><td>8. money</td></tr>
+</table></div>
+<p><strong>Step 1: the priors.</strong> 4 of 8 are spam, so P(spam) = 0.5 and P(ham) = 0.5.</p>
+<p><strong>Step 2: count words in each pile.</strong></p>
+<div class="tw"><table>
+<tr><th>Word</th><th class="num">count in spam pile</th><th class="num">count in ham pile</th></tr>
+<tr><td>free</td><td class="num">3</td><td class="num">1</td></tr>
+<tr><td>winner</td><td class="num">3</td><td class="num">0</td></tr>
+<tr><td>money</td><td class="num">2</td><td class="num">2</td></tr>
+<tr><td>meeting</td><td class="num">0</td><td class="num">3</td></tr>
+<tr><th>Total words</th><th class="num">8</th><th class="num">6</th></tr>
+</table></div>
+<p><strong>Step 3: turn counts into probabilities, with a safety net.</strong> The raw estimate would be (count ÷ total words). But notice <em>winner</em> never appears in a ham email, and <em>meeting</em> never in spam. A probability of 0 would be a disaster, because multiplying by 0 wipes out every other clue (the <strong>zero-frequency problem</strong>). The fix is <strong>Laplace smoothing</strong>: pretend every word was seen once more than it really was:</p>
+<div class="callout math">
+<p>P(word | class) = (count + 1) ÷ (total words in class + 4), where 4 is the vocabulary size.</p>
+<div class="tw"><table>
+<tr><th>Word</th><th class="num">P(word | spam)</th><th class="num">P(word | ham)</th></tr>
+<tr><td>free</td><td class="num">(3+1) ÷ (8+4) = 0.333</td><td class="num">(1+1) ÷ (6+4) = 0.200</td></tr>
+<tr><td>winner</td><td class="num">(3+1) ÷ 12 = 0.333</td><td class="num">(0+1) ÷ 10 = 0.100</td></tr>
+<tr><td>money</td><td class="num">(2+1) ÷ 12 = 0.250</td><td class="num">(2+1) ÷ 10 = 0.300</td></tr>
+<tr><td>meeting</td><td class="num">(0+1) ÷ 12 = 0.083</td><td class="num">(3+1) ÷ 10 = 0.400</td></tr>
+</table></div></div>
+<p><strong>Step 4: classify a new email: "free winner".</strong></p>
+<div class="callout math">
+<p>spam score = 0.5 × 0.333 × 0.333 = <strong>0.0556</strong>
+<br>ham score = 0.5 × 0.200 × 0.100 = <strong>0.0100</strong>
+<br>Total = 0.0656. So P(spam) = 0.0556 ÷ 0.0656 = <strong>0.85</strong> and P(ham) = 0.15. → <strong>Spam.</strong></p>
+<p>Now try "meeting money": spam = 0.5 × 0.083 × 0.25 = 0.0104; ham = 0.5 × 0.4 × 0.3 = 0.06; P(spam) = 0.0104 ÷ 0.0704 = <strong>0.15</strong> → <strong>ham</strong>.</p></div>
+<p>Now do it yourself. Pick the words in a new email and watch each clue multiply in. Set the smoothing to 0 and include <em>meeting</em> to see the zero-frequency disaster.</p>
+<div class="demo" data-title="Naïve Bayes spam filter: build an email and classify it" id="demo-spam">
+  <div class="controls" data-controls></div>
+  <div class="db"><div class="tw"><table id="spamTbl"></table></div></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout tip"><p><strong>A practical detail: use logs.</strong> A real email has hundreds of words, and multiplying hundreds of numbers below 1 gives a number so tiny that the computer rounds it to 0 (underflow). Real implementations add the <em>logarithms</em> of the probabilities instead; the ranking is identical. scikit-learn does this for you.</p></div>
+
+<h2>5. Why "naïve" can bite: repeated clues</h2>
+<p>Because the model multiplies clues as if each were new information, <strong>duplicated or highly correlated features are counted several times</strong>. If a clue that doubles the odds of spam appears as 5 copies (five features that all say the same thing), the model treats it as 2⁵ = 32 times stronger. The classification is often still right, but the <em>probability</em> becomes overconfident.</p>
+<div class="demo" data-title="Overconfidence from copies of the same clue" id="demo-copy">
+  <div class="db"><div id="copyBars"></div></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>So treat Naïve Bayes probabilities as <em>scores for ranking</em>, not calibrated truths. (You can calibrate them afterwards with <code>CalibratedClassifierCV</code>.)</p>
+
+<h2>6. Continuous features: Gaussian Naïve Bayes</h2>
+<p>Words are counts, but many features are measurements (age, height, income). For those, Naïve Bayes summarises each class with a <strong>bell curve</strong> per feature: just the average and the spread (standard deviation) of that feature within the class. The "likelihood" of a new value is then the <em>height of that class's bell curve at that value</em>.</p>
+<div class="callout math">
+<p><em>Example.</em> Predict whether a customer will buy from their age, using equal priors. Buyers: average age 30, spread 5. Non-buyers: average 40, spread 6. A new customer is 34.
+<br>• Height of the buyer bell at 34 ≈ <strong>0.0579</strong> (34 is 0.8 spreads from 30).
+<br>• Height of the non-buyer bell at 34 ≈ <strong>0.0403</strong> (34 is 1 spread from 40).
+<br>P(buyer) = 0.0579 ÷ (0.0579 + 0.0403) = <strong>0.59</strong> → predict "buys", but only mildly confident.</p>
+<p>With several features you multiply the bell-curve heights of each feature (the naïve step again).</p></div>
+<div class="demo" data-title="Two bell curves: who does this value belong to?" id="demo-gauss">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="tw"><table>
+<tr><th>Variant in scikit-learn</th><th>Features it expects</th><th>Typical use</th></tr>
+<tr><td><code>GaussianNB</code></td><td>Continuous numbers (assumed bell-shaped per class)</td><td>Measurements, sensor data</td></tr>
+<tr><td><code>MultinomialNB</code></td><td>Counts (word counts, TF-IDF)</td><td>Text classification, topic tagging</td></tr>
+<tr><td><code>BernoulliNB</code></td><td>Binary 0/1 (word present or not)</td><td>Short texts, yes/no features</td></tr>
+<tr><td><code>CategoricalNB</code></td><td>Categories coded 0…k</td><td>Tabular data with category columns</td></tr>
+<tr><td><code>ComplementNB</code></td><td>Counts</td><td>Text with imbalanced classes</td></tr>
+</table></div>
+
+<h2>7. Naïve Bayes in scikit-learn</h2>
+<p>Our spam example, exactly as computed by hand:</p>
+<pre class="code">
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+
+emails = ["free winner", "free money", "free winner money", "winner",
+          "meeting money", "meeting", "free meeting", "money"]
+labels = [1, 1, 1, 1, 0, 0, 0, 0]          # 1 = spam, 0 = ham
+
+vec = CountVectorizer()                     # turns text into word-count columns
+X = vec.fit_transform(emails)
+
+model = MultinomialNB(alpha=1.0)            # alpha = the Laplace smoothing (the "+1")
+model.fit(X, labels)
+
+print(model.predict_proba(vec.transform(["free winner"])))     # about [[0.15 0.85]]  (ham, spam)
+print(model.predict(vec.transform(["meeting money"])))         # [0]  ham
+</pre>
+<p>The probabilities match our hand calculation (0.85 spam). Two other everyday patterns: a text pipeline, and continuous data with <code>GaussianNB</code>.</p>
+<pre class="code">
+from sklearn.pipeline import make_pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+
+text_clf = make_pipeline(TfidfVectorizer(stop_words="english"), MultinomialNB(alpha=0.5))
+text_clf.fit(train_texts, train_labels)
+text_clf.predict(["Congratulations! You are a winner, claim your free prize"])
+
+# Continuous features
+from sklearn.datasets import load_iris
+from sklearn.naive_bayes import GaussianNB
+from sklearn.model_selection import cross_val_score
+
+X, y = load_iris(return_X_y=True)
+print(cross_val_score(GaussianNB(), X, y, cv=5).mean())   # typically about 0.95
+</pre>
+<div class="tw"><table>
+<tr><th>Parameter / method</th><th>What it does</th></tr>
+<tr><td><code>alpha</code> (Multinomial/Bernoulli)</td><td>Laplace smoothing. 1.0 = add-one (our "+1"); smaller (0.1 to 0.5) often works better for large vocabularies; must not be 0 in practice.</td></tr>
+<tr><td><code>var_smoothing</code> (Gaussian)</td><td>Adds a tiny amount to each variance so a feature with zero spread doesn't break the maths.</td></tr>
+<tr><td><code>class_prior</code></td><td>Override the priors (e.g. force 50/50 or the real-world spam rate).</td></tr>
+<tr><td><code>predict_proba</code></td><td>Class probabilities. Good for ranking; often over-confident.</td></tr>
+<tr><td><code>partial_fit</code></td><td>Learn from data in chunks (online learning). Naïve Bayes only needs counts, so this is easy.</td></tr>
+</table></div>
+
+<h2>8. Strengths, limits and when to use it</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Extremely fast to train (it just counts) and to predict</td><td>Independence assumption is usually false</td></tr>
+<tr><td>Works with very little data and with many features</td><td>Probabilities are over-confident and poorly calibrated</td></tr>
+<tr><td>Handles many classes naturally</td><td>Can't learn interactions ("free" is fine, but "free" + "meeting" together is different)</td></tr>
+<tr><td>Great baseline for text; easy to update with new data</td><td>Unseen feature values need smoothing; Gaussian version assumes bell-shaped data</td></tr>
+</table></div>
+<p><strong>Reach for it when:</strong> you need a quick, strong baseline; the data is text or high-dimensional and sparse; you need real-time predictions; or the training set is small. <strong>Prefer something else when</strong> feature interactions are crucial or you need well-calibrated probabilities (try logistic regression or gradient boosting).</p>
+
+<h2>9. Naïve Bayes in the real world</h2>
+<div class="cards">
+<div class="card"><h4>📧 Spam filtering</h4><p>The original hit application: early filters like the ones popularised in the early 2000s were Naïve Bayes over words.</p></div>
+<div class="card"><h4>💬 Sentiment analysis</h4><p>Is this review positive or negative? Word counts per class make an instant baseline.</p></div>
+<div class="card"><h4>📰 News & topic tagging</h4><p>Sports, politics, business: each has its own tell-tale vocabulary.</p></div>
+<div class="card"><h4>🩺 Medical screening</h4><p>Combine symptoms and test results as independent clues to rank likely conditions.</p></div>
+<div class="card"><h4>🌐 Language detection</h4><p>Letter and word patterns differ by language; Naïve Bayes identifies the language of a snippet in microseconds.</p></div>
+<div class="card"><h4>⚡ Real-time & streaming</h4><p>Because it only keeps counts, it can update on the fly, e.g. in a system learning from users flagging spam.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Naïve Bayes applies <strong>Bayes' theorem</strong>: posterior = likelihood × prior ÷ evidence.</li>
+<li>The <strong>naïve</strong> assumption (features independent given the class) lets it simply <strong>multiply</strong> the clues, so it needs very little data.</li>
+<li>Score for each class = prior × product of P(feature | class); the biggest wins. Normalise to get probabilities.</li>
+<li><strong>Laplace smoothing</strong> (<code>alpha</code>) prevents a single zero count from wiping out all the evidence.</li>
+<li>Choose the variant by feature type: <code>MultinomialNB</code> (counts), <code>BernoulliNB</code> (0/1), <code>GaussianNB</code> (continuous).</li>
+<li>Great fast baseline, especially for text; treat its probabilities as rankings, not exact truths.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>Using the tables in section 4, classify the one-word email "<strong>money</strong>" by hand. What is P(spam)?</li>
+<li>Now classify "<strong>free winner meeting</strong>" and explain in one sentence why the answer is much less certain than for "free winner".</li>
+<li>Explain what would go wrong with the email "winner" if we used <strong>no</strong> smoothing (alpha = 0) and it also contained the word "meeting".</li>
+<li>Bonus: run the scikit-learn code, then change <code>alpha</code> to 0.1 and to 5. How do the probabilities for "free winner" change?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> spam = 0.5 × 0.25 = 0.125; ham = 0.5 × 0.3 = 0.15; P(spam) = 0.125 ÷ 0.275 = 0.45 (so slightly more likely ham).</p>
+<p><b>2.</b> spam = 0.5 × 0.333 × 0.333 × 0.083 = 0.0046; ham = 0.5 × 0.2 × 0.1 × 0.4 = 0.0040; P(spam) ≈ 0.54. "meeting" is a strong ham clue that cancels the spam clues, so the evidence is nearly balanced.</p>
+<p><b>3.</b> With alpha = 0, "winner" has probability 0 in ham and "meeting" has probability 0 in spam, so both class scores become 0 and the result is undefined (0 ÷ 0). One missing word erases every other clue.</p>
+<p><b>4.</b> Smaller alpha (0.1) makes the probabilities more extreme (closer to 0 or 1); larger alpha (5) pulls them towards 0.5 because the smoothing dominates the tiny counts.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/naive-bayes.js"></script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XGBoost · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="xgb">
+<article id="lesson">
+
+<h1>XGBoost</h1>
+<p class="lede">XGBoost ("eXtreme Gradient Boosting") is gradient boosting with two upgrades: a built-in <em>penalty for over-complicated trees</em>, and a smarter way of choosing splits that uses a little more information about the loss. Add a lot of engineering for speed and you get one of the most widely used tools for table-shaped data.</p>
+<div class="meta"><span class="chip">Intermediate to advanced</span><span class="chip plain">≈ 100 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: gradient boosting with a leash</h2>
+<p>You already know the core loop from the last lesson: start with a guess, and add small trees that correct what is left over. XGBoost keeps that loop and changes <em>how each tree is built</em>.</p>
+<div class="callout analogy"><p><strong>The golfer gets a coach.</strong> In plain gradient boosting the golfer takes every corrective shot as advised. XGBoost adds a coach with two rules: <em>"don't make the swing more complicated than it needs to be"</em> (a price for every extra leaf, called γ) and <em>"don't trust a suggestion built on only a couple of shots"</em> (shrink the size of each correction, called λ). The coach also brings a stopwatch: XGBoost is engineered to search for splits quickly and to use all your CPU cores.</p></div>
+<div class="tw"><table>
+<tr><th>Feature</th><th>Plain gradient boosting</th><th>XGBoost</th></tr>
+<tr><td>Tree building</td><td>Fit a tree to the residuals, take average residual in each leaf</td><td>Choose splits and leaf values from two numbers per point, <b>g</b> (gradient) and <b>h</b> (hessian)</td></tr>
+<tr><td>Complexity control</td><td>Only tree depth, leaf size and learning rate</td><td>Also a price <b>γ</b> per leaf and shrinkage <b>λ</b> on leaf values, built into the split score</td></tr>
+<tr><td>Missing values</td><td>Must be filled in first (in classic scikit-learn)</td><td>Each split learns a default direction for missing values</td></tr>
+<tr><td>Speed</td><td>Sequential, exact splits</td><td>Histogram splits, parallel search, column sampling, GPU support</td></tr>
+<tr><td>Extras</td><td>Basic early stopping</td><td>Evaluation sets, early stopping, built-in cross-validation, many objectives</td></tr>
+</table></div>
+
+<h2>2. The maths in plain words</h2>
+<p>XGBoost tries to minimise <strong>(how wrong the model is) + (a penalty for how complicated the trees are)</strong>. The penalty adds up two things: γ for each leaf, and a term that grows with the size of the leaf values (controlled by λ). Everything else follows from a bit of algebra, which we skip. What you need to know are four simple recipes.</p>
+<div class="callout math">
+<p><strong>Two numbers per training point.</strong> For each point, given the current prediction:</p>
+<ul>
+<li><b>g</b>, the <b>gradient</b>: which way and how far the prediction is off. For squared error, g = prediction − actual. For classification, g = p − y (p is the predicted probability, y is 0 or 1).</li>
+<li><b>h</b>, the <b>hessian</b>: how "curved" the loss is there, roughly how much the loss cares. For squared error, h = 1 for every point. For classification, h = p × (1 − p): large when the model is unsure (p near 0.5), tiny when it is already confident.</li>
+</ul>
+<p>Add up g and h over the points in a group of points (a leaf): <b>G = Σg</b>, <b>H = Σh</b>. Then:</p>
+<ol>
+<li><b>Leaf value</b> (what the leaf adds to the prediction) = <b>−G ÷ (H + λ)</b>. Without λ this is just the average residual. With λ, small groups (small H) are pulled strongly towards 0.</li>
+<li><b>Similarity score</b> of a group = <b>G² ÷ (H + λ)</b>. High when the group's points all want to be corrected in the same direction.</li>
+<li><b>Gain of a split</b> = (similarity of left) + (similarity of right) − (similarity of the group before splitting) − <b>γ</b>.</li>
+<li>Build the tree by taking the split with the biggest gain. If the best gain is not above 0 after subtracting γ, <b>don't split</b> ("pruning"). Finally the prediction is updated by <b>eta × leaf value</b> (eta = learning rate).</li>
+</ol></div>
+
+<h3>A complete worked example: regression</h3>
+<p>The same six points as in the Gradient Boosting lesson so you can compare. Settings: λ = 1, γ = 0, learning rate (eta) = 0.5, depth 1. Starting prediction = average of y = 6.5.</p>
+<div class="tw"><table>
+<tr><th>x</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="num">6</td></tr>
+<tr><th>y</th><td class="num">2</td><td class="num">4</td><td class="num">3</td><td class="num">9</td><td class="num">11</td><td class="num">10</td></tr>
+<tr><th>g = 6.5 − y</th><td class="num">4.5</td><td class="num">2.5</td><td class="num">3.5</td><td class="num">−2.5</td><td class="num">−4.5</td><td class="num">−3.5</td></tr>
+<tr><th>h</th><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td></tr>
+</table></div>
+<div class="callout math">
+<p><strong>Round 1.</strong> All six points together: G = 4.5 + 2.5 + 3.5 − 2.5 − 4.5 − 3.5 = 0, so the similarity score of the whole group is 0² ÷ (6 + 1) = <b>0</b>. Now try every cut:</p>
+<div class="tw"><table>
+<tr><th>Cut</th><th class="num">left G, H</th><th class="num">left similarity</th><th class="num">right G, H</th><th class="num">right similarity</th><th class="num">Gain</th></tr>
+<tr><td>x ≤ 1.5</td><td class="num">4.5, 1</td><td class="num">4.5² ÷ 2 = 10.13</td><td class="num">−4.5, 5</td><td class="num">4.5² ÷ 6 = 3.38</td><td class="num">13.50</td></tr>
+<tr><td>x ≤ 2.5</td><td class="num">7, 2</td><td class="num">49 ÷ 3 = 16.33</td><td class="num">−7, 4</td><td class="num">49 ÷ 5 = 9.80</td><td class="num">26.13</td></tr>
+<tr><td><b>x ≤ 3.5</b></td><td class="num">10.5, 3</td><td class="num">110.25 ÷ 4 = 27.56</td><td class="num">−10.5, 3</td><td class="num">27.56</td><td class="num"><b>55.13</b> ★</td></tr>
+<tr><td>x ≤ 4.5</td><td class="num">8, 4</td><td class="num">64 ÷ 5 = 12.80</td><td class="num">−8, 2</td><td class="num">64 ÷ 3 = 21.33</td><td class="num">34.13</td></tr>
+<tr><td>x ≤ 5.5</td><td class="num">3.5, 5</td><td class="num">12.25 ÷ 6 = 2.04</td><td class="num">−3.5, 1</td><td class="num">12.25 ÷ 2 = 6.13</td><td class="num">8.17</td></tr>
+</table></div>
+<p>The best cut is <b>x ≤ 3.5</b> (gain 55.13). Leaf values: left = −10.5 ÷ (3 + 1) = <b>−2.625</b>, right = +10.5 ÷ 4 = <b>+2.625</b>. Notice these are smaller than the plain residual averages (−3.5 and +3.5): λ has shrunk them by a factor 3 ÷ 4. With eta = 0.5 each prediction moves by half of that: 6.5 − 1.3125 = <b>5.1875</b> for x = 1 to 3 and 6.5 + 1.3125 = <b>7.8125</b> for x = 4 to 6. MSE = <b>5.45</b>.</p>
+<p><strong>Round 2.</strong> New g = prediction − y: 3.19, 1.19, 2.19, −1.19, −3.19, −2.19. Again x ≤ 3.5 wins (gain <b>21.53</b>), leaf values ∓ 6.5625 ÷ 4 = <b>∓1.6406</b>. With eta 0.5: predictions <b>4.367</b> and <b>8.633</b>, MSE = <b>2.54</b>.</p>
+<p><strong>Round 3.</strong> Same split, leaf values ∓1.0254, predictions <b>3.854</b> and <b>9.146</b>, MSE = <b>1.40</b>.</p></div>
+<p>Compared with plain gradient boosting (MSE 3.73 → 1.43 → 0.72 for the same three rounds), XGBoost moves more <em>cautiously</em>: that is λ at work. On six noise-free-looking points this just looks slower, but on real, noisy data that caution is exactly what stops trees from overreacting to a few odd points.</p>
+<div class="callout tip"><p><strong>The price of a leaf: γ.</strong> The winning split had a gain of 55.13. If we set γ = 50, the split's net worth is 5.13 and it is kept. If γ = 60, its net worth is negative, so the tree <b>refuses to split at all</b> and stays a single leaf that adds nothing. (I ran this in XGBoost: γ = 50 keeps the split, γ = 60 gives a tree with no splits.) γ therefore acts as a threshold: <em>only make a split if it improves the objective by more than γ</em>.</p></div>
+
+<h3>Classification by hand</h3>
+<p>Labels <b>0, 0, 1, 1, 0, 1</b> for x = 1 to 6. Start: p = 0.5 for every point (score 0). Then g = p − y = <b>+0.5, +0.5, −0.5, −0.5, +0.5, −0.5</b> and h = 0.5 × 0.5 = <b>0.25</b> for every point. Use λ = 1, eta = 1.</p>
+<div class="callout math">
+<p>Gains for the five cuts (using G²÷(H+1) on each side): x ≤ 1.5 → 0.31; <b>x ≤ 2.5 → 1.17</b>; x ≤ 3.5 → 0.29; x ≤ 4.5 → 0; x ≤ 5.5 → 0.31. The best is <b>x ≤ 2.5</b>:</p>
+<ul>
+<li>Left (points 1, 2): G = 1, H = 0.5 → value = −1 ÷ (0.5 + 1) = <b>−0.667</b>.</li>
+<li>Right (points 3 to 6): G = −1, H = 1 → value = +1 ÷ (1 + 1) = <b>+0.5</b>.</li>
+</ul>
+<p>As probabilities: 1 ÷ (1 + e<sup>0.667</sup>) = <b>0.339</b> for points 1 and 2, and 1 ÷ (1 + e<sup>−0.5</sup>) = <b>0.622</b> for points 3 to 6. Plain gradient boosting on the same data gave −2 and +1 (probabilities 0.119 and 0.731): XGBoost's λ makes the first step much gentler.</p></div>
+<div class="callout warn"><p><strong>A real gotcha: <code>min_child_weight</code>.</strong> This parameter demands a minimum <em>sum of h</em> in every leaf (default 1). For squared error h = 1 per point, so it means "at least one point". But for classification h = p(1 − p) is at most 0.25, so a leaf needs several points, and in our tiny example the left leaf has H = 0.5 &lt; 1. With the default setting XGBoost refuses the split, and the model learns nothing (I ran it: a single leaf with value 0). To reproduce the hand calculation I had to set <code>min_child_weight=0</code>. On real datasets with hundreds of rows this rarely matters, but it is a common cause of "my tiny test model does nothing".</p></div>
+
+<h3>Play with the split score</h3>
+<p>These are the five bars from the regression table. Move λ and γ and watch which cuts survive, and how the leaf values shrink.</p>
+<div class="demo" data-title="Split gain, λ and γ" id="demo-gain">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>3. What λ and γ do to a real fit</h2>
+<p>Forty noisy points from a smooth curve. Two boosted models are trained with identical settings, except that one has the penalties (λ, γ as chosen) and the other has none. Both are XGBoost-style trees using the gain formula above (the "no penalty" one has λ = 0 and γ = 0, which is essentially plain gradient boosting).</p>
+<div class="demo" data-title="Regularisation in action" id="demo-reg">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--accent)"></i>with λ and γ</span><span><i style="background:var(--c1)"></i>λ = 0, γ = 0 (dashed)</span><span>orange dots = training points · dashed grey = the true curve</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li>Push the depth up to 6 to 8 with the penalties at 0: the dashed curve becomes jagged. Then raise λ: the pink curve stays smooth.</li>
+<li>Watch the "leaves per tree" figures: γ prunes away weak splits, so the regularised trees are smaller.</li>
+<li>Set γ to 5: most trees can no longer find a split worth its price and the model stops learning (underfitting). Penalties are a dial, not a "more is better" switch.</li>
+<li>Press "New random data" a few times: the penalised model usually wins on test error when the trees are deep, but not always.</li>
+</ul>
+<div class="demo" data-title="An XGBoost-style classifier on curved classes" id="demo-2d">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class 1</span><span><i style="background:var(--c2)"></i>class 0</span><span>filled = training (size = how wrong/unsure) · hollow = test · lines: blue = training accuracy, orange = test accuracy</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>This uses the classification recipe from the worked example (g = p − y, h = p(1 − p), gain with λ and γ). Try depth 5 with λ = 0 and watch training accuracy hit 100% while test accuracy stalls, then add λ and γ. (In this demo <code>min_child_weight</code> is 0, so tiny leaves are allowed.)</p>
+
+<h2>4. Why it is fast: the engineering</h2>
+<ul>
+<li><strong>Histogram splits</strong> (<code>tree_method="hist"</code>, the default in recent versions): instead of trying a cut between every pair of values, group each feature into a few hundred bins and try only the bin edges. Far fewer candidate splits, almost the same accuracy.</li>
+<li><strong>Parallel split search:</strong> although trees are built one after another, the search for the best cut across features and bins can use all CPU cores (or a GPU).</li>
+<li><strong>Column and row subsampling:</strong> <code>colsample_bytree</code> and <code>subsample</code> use only a random fraction of the features and rows for each tree, adding random-forest-like diversity and speed.</li>
+<li><strong>Sparsity-aware splits:</strong> for each split XGBoost tries sending missing values left and right and remembers the direction that lowers the loss. You can leave NaNs in the data.</li>
+<li><strong>Early stopping and built-in evaluation:</strong> watch a validation set during training and stop when it stops improving.</li>
+</ul>
+
+<h2>5. XGBoost in Python</h2>
+<p>XGBoost is a separate library (<code>pip install xgboost</code>), not part of scikit-learn, but its <code>XGBClassifier</code> and <code>XGBRegressor</code> follow the scikit-learn interface (<code>fit</code>, <code>predict</code>, pipelines, <code>GridSearchCV</code>). The results below come from an actual run with XGBoost 3.4.1 and scikit-learn 1.9.0; other versions may differ.</p>
+<p>First, our worked example (settings chosen to match the hand calculation):</p>
+<pre class="code">
+import numpy as np
+import xgboost as xgb
+
+X = np.arange(1, 7).reshape(-1, 1).astype(float)
+y = np.array([2, 4, 3, 9, 11, 10.])
+
+m = xgb.XGBRegressor(n_estimators=3, max_depth=1, learning_rate=0.5,
+                     reg_lambda=1, gamma=0, base_score=6.5,
+                     tree_method="exact").fit(X, y)
+
+booster = m.get_booster()
+for k in (1, 2, 3):        # prediction after k trees
+    print(booster.predict(xgb.DMatrix(X), iteration_range=(0, k)).round(4))
+# [5.1875 5.1875 5.1875 7.8125 7.8125 7.8125]
+# [4.3672 4.3672 4.3672 8.6328 8.6328 8.6328]
+# [3.8545 3.8545 3.8545 9.1455 9.1455 9.1455]   -> all match the hand calculation
+
+print(booster.get_dump(with_stats=True)[0])
+# 0:[f0&lt;3.5] yes=1,no=2,missing=1,gain=55.125,cover=6
+#     1:leaf=-1.3125,cover=3          (= eta 0.5 x -2.625)
+#     2:leaf=1.3125,cover=3
+</pre>
+<p>The tree dump shows exactly the split (x &lt; 3.5), gain (55.125) and leaf values we computed. Now the realistic recipe: a real dataset, row and column subsampling, and early stopping on a validation slice.</p>
+<pre class="code">
+import xgboost as xgb
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+clf = xgb.XGBClassifier(random_state=42).fit(X_train, y_train)     # defaults
+print(clf.score(X_test, y_test))                                   # 0.965
+
+X_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, test_size=0.2,
+                                              stratify=y_train, random_state=0)
+clf = xgb.XGBClassifier(n_estimators=1000, learning_rate=0.05, max_depth=3,
+                        subsample=0.8, colsample_bytree=0.8,
+                        early_stopping_rounds=20, eval_metric="logloss", random_state=42)
+clf.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)
+print(clf.best_iteration, clf.score(X_test, y_test))               # 581 trees, 0.965
+
+# missing values: blank out 10% of the entries in train AND test, no imputation
+# (this run: 0.965 again, the splits learned where to send the missing values)
+</pre>
+<p>Cross-validated accuracy of the default model was 0.970 (5-fold), against 0.963 for scikit-learn's gradient boosting and 0.958 for the random forest. On a dataset this small and easy those gaps are only a few rows, so don't over-read them. It is on harder problems that tuning matters, as the noisy diabetes regression shows (R² on the same split as earlier lessons):</p>
+<pre class="code">
+xgb.XGBRegressor(random_state=0)                                    # defaults: R² = 0.049
+xgb.XGBRegressor(n_estimators=200, learning_rate=0.03, max_depth=2,
+                 subsample=0.8, colsample_bytree=0.8, reg_lambda=5,
+                 random_state=0)                                    # tuned:    R² = 0.298
+# for comparison on the same split: random forest 0.250, tuned gradient boosting 0.315
+</pre>
+<p>Default XGBoost is a poor fit for this tiny, noisy dataset (it uses deep, fast-learning trees), and careful settings fix that. Boosting libraries reward tuning, and the tuned scikit-learn gradient boosting model did just as well.</p>
+<div class="tw"><table>
+<tr><th>Parameter</th><th>What it does</th></tr>
+<tr><td><code>n_estimators</code></td><td>Number of boosting rounds. Set it high and rely on <code>early_stopping_rounds</code>.</td></tr>
+<tr><td><code>learning_rate</code> (eta)</td><td>Shrinks each tree's contribution (default 0.3). Lower (0.01 to 0.1) with more rounds is the usual best practice.</td></tr>
+<tr><td><code>max_depth</code></td><td>Depth of each tree (default 6). Try 3 to 6; shallower for small or noisy data.</td></tr>
+<tr><td><code>min_child_weight</code></td><td>Minimum sum of h in a leaf (default 1). Raise it to forbid leaves built on very few points.</td></tr>
+<tr><td><code>gamma</code></td><td>Minimum gain needed to split (default 0). Raise to prune weak splits.</td></tr>
+<tr><td><code>reg_lambda</code>, <code>reg_alpha</code></td><td>L2 (default 1) and L1 (default 0) penalties on the leaf values. λ is the one in this lesson; α pushes small leaf values to exactly 0.</td></tr>
+<tr><td><code>subsample</code>, <code>colsample_bytree</code></td><td>Fraction of rows and of features used per tree. 0.6 to 1.0 is typical.</td></tr>
+<tr><td><code>tree_method</code></td><td><code>"hist"</code> (fast, default in recent versions), <code>"exact"</code> (checks every cut), <code>"approx"</code>.</td></tr>
+<tr><td><code>scale_pos_weight</code></td><td>Up-weights the positive class in imbalanced binary problems (a common choice: number of negatives ÷ number of positives).</td></tr>
+<tr><td><code>early_stopping_rounds</code>, <code>eval_set</code>, <code>eval_metric</code></td><td>Stop when the validation metric has not improved for that many rounds; <code>best_iteration</code> records where.</td></tr>
+<tr><td><code>objective</code></td><td>The loss: <code>reg:squarederror</code>, <code>binary:logistic</code>, <code>multi:softprob</code>, ranking objectives and more (set automatically by the classifier and regressor classes).</td></tr>
+<tr><td><code>feature_importances_</code></td><td>Importance per feature (in the breast-cancer run above, "worst radius" took about 52%).</td></tr>
+</table></div>
+<p>A sensible tuning order: fix <code>learning_rate</code> (0.05 to 0.1), find <code>n_estimators</code> by early stopping, then tune <code>max_depth</code> and <code>min_child_weight</code>, then <code>subsample</code> and <code>colsample_bytree</code>, then <code>gamma</code> and <code>reg_lambda</code>, and finally lower the learning rate and retrain. A grid or random search with cross-validation is the tool for the middle steps, which is our next lesson.</p>
+
+<h2>6. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Excellent accuracy on tabular data, often the top performer</td><td>Many hyperparameters; defaults are not always good (see the diabetes example)</td></tr>
+<tr><td>Built-in regularisation and early stopping</td><td>Can still overfit noisy labels if trees are deep and rounds too many</td></tr>
+<tr><td>Handles missing values and needs no scaling</td><td>Less suited to images, audio and text than neural networks</td></tr>
+<tr><td>Fast and scalable (histograms, multi-core, GPU, big data)</td><td>Harder to interpret than a single tree; cannot extrapolate beyond the training range</td></tr>
+<tr><td>Many built-in losses: regression, classification, ranking, counts, quantiles</td><td>An extra dependency, and results can vary between versions</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🏆 Competitions</h4><p>XGBoost became famous by winning many tabular-data contests, and it is still a standard first serious model to try.</p></div>
+<div class="card"><h4>🏦 Fraud and credit risk</h4><p>Millions of transactions, hundreds of mixed features, missing values everywhere: exactly what it was built for.</p></div>
+<div class="card"><h4>📈 Click-through and ranking</h4><p>Ranking objectives order search results or ads; log-loss models estimate click probabilities.</p></div>
+<div class="card"><h4>🏭 Predictive maintenance</h4><p>Sensor readings and service history predict which machine fails next; scale_pos_weight handles the rarity of failures.</p></div>
+<div class="card"><h4>🛍️ Demand forecasting</h4><p>Turn dates, prices and promotions into features and predict sales for each item and store.</p></div>
+<div class="card"><h4>🧬 Genomics and medicine</h4><p>Risk models from lab values and gene measurements, with feature importances to guide follow-up.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>XGBoost = gradient boosting whose trees are built from <strong>g</strong> (gradient) and <strong>h</strong> (hessian) with a built-in <strong>penalty on complexity</strong>.</li>
+<li>Leaf value = <b>−G ÷ (H + λ)</b>. Similarity = <b>G² ÷ (H + λ)</b>. Gain = left + right − parent − <b>γ</b>. Do not split when the gain is not above 0 after γ.</li>
+<li><strong>λ</strong> shrinks leaf values (small groups most); <strong>γ</strong> is the price of a leaf; <strong>min_child_weight</strong> sets a minimum amount of "h" per leaf, and it can block tiny classification trees.</li>
+<li>Worked example: the same six points as plain boosting give a more cautious 5.45 → 2.54 → 1.40 (vs 3.73 → 1.43 → 0.72), and XGBoost reproduced every number.</li>
+<li>Speed comes from histogram splits, parallel search, subsampling, sparsity-aware missing-value handling and GPU support.</li>
+<li>Tune with a small learning rate, many trees and <strong>early stopping</strong>; defaults are a starting point, not an answer.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (25 minutes, optional).</strong></p>
+<ol>
+<li>A group of points has G = 6 and H = 3. Compute its similarity score with λ = 1, and with λ = 0. What does the larger λ do?</li>
+<li>A leaf has G = −12, H = 4, λ = 2. What is its leaf value, and how much does it add to the prediction with a learning rate of 0.3?</li>
+<li>A candidate split has left (G = 8, H = 4), right (G = −8, H = 2), parent (G = 0, H = 6), λ = 1. Compute the gain. Is the split kept when γ = 40?</li>
+<li>For a classification point with p = 0.8 and y = 1, what are g and h?</li>
+<li>Bonus: install XGBoost and run the breast-cancer code. Change <code>gamma</code> from 0 to 1 to 5 and <code>reg_lambda</code> from 1 to 10. Do the test score and the best iteration change?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> λ = 1: 6² ÷ (3 + 1) = 36 ÷ 4 = <b>9</b>. λ = 0: 36 ÷ 3 = <b>12</b>. A larger λ lowers the similarity score (and the leaf value), so the group looks less convincing: this is the shrinkage.</p>
+<p><b>2.</b> Leaf value = −G ÷ (H + λ) = 12 ÷ 6 = <b>2</b>. With eta 0.3 it adds 0.3 × 2 = <b>0.6</b>.</p>
+<p><b>3.</b> Left similarity = 64 ÷ 5 = 12.8, right = 64 ÷ 3 = 21.33, parent = 0. Gain = 12.8 + 21.33 − 0 = <b>34.13</b> (this is the x ≤ 4.5 cut from the worked example). With γ = 40: 34.13 − 40 = −5.87, which is not above 0, so the split is <b>pruned</b>.</p>
+<p><b>4.</b> g = p − y = 0.8 − 1 = <b>−0.2</b> (the model should push the score up a little). h = p(1 − p) = 0.8 × 0.2 = <b>0.16</b>.</p>
+<p><b>5.</b> Small changes are typical on such an easy dataset (test accuracy is usually within a row or two), but a larger <code>gamma</code> or <code>reg_lambda</code> usually gives simpler trees and may change how many rounds early stopping needs. Results depend on your versions.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/xgboost.js"></script>
+</body>
+</html>

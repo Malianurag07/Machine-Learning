@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logistic Regression · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="logreg">
+<article id="lesson">
+
+<h1>Logistic Regression</h1>
+<p class="lede">Despite its name, Logistic Regression is a <em>classification</em> algorithm. It predicts the probability that something belongs to a class (spam, fraud, will-pass) and then turns that probability into a yes/no answer.</p>
+<div class="meta"><span class="chip">Beginner</span><span class="chip plain">≈ 80 min</span><span class="chip plain">5 interactive demos</span></div>
+
+<h2>1. Why not just use linear regression for yes/no?</h2>
+<p>Suppose we want to predict whether a student <strong>passes</strong> (1) or <strong>fails</strong> (0) from the hours they studied. Linear regression draws a straight line through the 0s and 1s and reads the height as the prediction. Two things go wrong:</p>
+<ul>
+<li>The line keeps going: it predicts <strong>−0.2</strong> or <strong>1.3</strong>, which cannot be a probability.</li>
+<li>One unusual student (someone who studied 14 hours and passed) tilts the whole line, and the boundary between "pass" and "fail" moves for everybody.</li>
+</ul>
+<p>What we want is an S-shaped curve that stays between 0 and 1 and is not thrown off by extreme points. That curve is the <strong>sigmoid</strong>, and a model built on it is <strong>Logistic Regression</strong>.</p>
+<div class="demo" data-title="Straight line vs. S-curve on pass/fail data" id="demo-lin">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>failed (0)</span><span><i style="background:var(--c3)"></i>passed (1)</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<div class="callout analogy"><p><strong>A confidence dial.</strong> Imagine a doctor who weighs the evidence and turns a dial from 0 ("definitely healthy") to 1 ("definitely ill"). The more evidence for illness, the further the dial turns, but it can never go past either end. Logistic regression is that dial: it adds up the evidence like linear regression does, then squeezes the total into the 0-to-1 range.</p></div>
+
+<h2>2. The idea: a score, squeezed into a probability</h2>
+<p>Logistic regression works in two steps.</p>
+<ol class="steps">
+<li><strong>Compute a score</strong> exactly like linear regression: <code>z = θ₀ + θ₁·x</code> (with more features: <code>z = θ₀ + θ₁x₁ + θ₂x₂ + …</code>). The score can be any number, from very negative to very positive.</li>
+<li><strong>Squeeze it</strong> with the <strong>sigmoid</strong> function to get a probability between 0 and 1.</li>
+</ol>
+$$p=\sigma(z)=\frac{1}{1+e^{-z}}$$
+<p><strong>In words:</strong> a huge positive score gives a probability near 1, a huge negative score gives near 0, and a score of exactly 0 gives 0.5. Some values:</p>
+<div class="tw"><table>
+<tr><th>score z</th><td class="num">−4</td><td class="num">−2</td><td class="num">−1</td><td class="num">0</td><td class="num">1</td><td class="num">2</td><td class="num">4</td></tr>
+<tr><th>probability p</th><td class="num">0.018</td><td class="num">0.119</td><td class="num">0.269</td><td class="num"><b>0.500</b></td><td class="num">0.731</td><td class="num">0.881</td><td class="num">0.982</td></tr>
+</table></div>
+<p>Then we turn the probability into a class with a <strong>threshold</strong>, normally 0.5: if p ≥ 0.5 predict class 1, otherwise class 0. Since p = 0.5 exactly when z = 0, the <strong>decision boundary</strong> is where the score is zero: θ₀ + θ₁x = 0, i.e. x = −θ₀ ÷ θ₁.</p>
+<div class="demo" data-title="Play with the sigmoid: score, probability, boundary" id="demo-sig">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>θ₁ (the slope)</strong> controls how <em>sharp</em> the switch is. Large |θ₁| gives a steep S (confident, almost a step); small |θ₁| gives a gentle S. A negative θ₁ flips the curve.</li>
+<li><strong>θ₀ (the intercept)</strong> slides the curve left or right, moving the decision boundary.</li>
+</ul>
+
+<h2>3. Odds and log-odds: how to read the weights</h2>
+<p>Probability and <strong>odds</strong> are two ways of saying the same thing. If p = 0.8 the odds are 0.8 ÷ 0.2 = 4 ("4 to 1 in favour"). Here is the neat fact about logistic regression: <strong>the score z is the logarithm of the odds</strong> (the "log-odds" or "logit"). So the model is a straight line in log-odds, and each weight has a clean meaning:</p>
+<div class="callout math">
+<p><strong>Rule:</strong> when x goes up by 1, the odds get multiplied by <code>e<sup>θ₁</sup></code>.</p>
+<p><em>Example.</em> Suppose θ₁ = 0.8 for "hours studied". Then e<sup>0.8</sup> ≈ 2.23, so <strong>each extra hour multiplies the odds of passing by about 2.2</strong>. If the odds were 1 to 1 (p = 0.5), one more hour makes them 2.2 to 1 (p = 0.69). Two more hours: 2.2 × 2.2 = 5 to 1 (p = 0.83).</p>
+<p>A positive weight increases the chance of class 1, a negative weight decreases it, and a weight near 0 means "this feature hardly matters". That readability is a big reason banks and hospitals still like this model.</p></div>
+
+<h2>4. How does it learn? The log-loss cost</h2>
+<p>As with linear regression, we need a number that says "how wrong is the model", and then we adjust θ to make that number smaller. Squared error is a poor choice here (with a sigmoid it produces a bumpy landscape with flat patches). Instead we use <strong>log-loss</strong> (also called <em>cross-entropy</em>), which has a simple meaning: <strong>how surprised is the model by the truth?</strong></p>
+<div class="callout math">
+<p>For one sample, with p = the model's probability of class 1:</p>
+<ul>
+<li>if the truth is <strong>1</strong>: cost = −log(p). (The bigger p is, the less surprised, the smaller the cost.)</li>
+<li>if the truth is <strong>0</strong>: cost = −log(1 − p). (Being confident it's 1 when it's really 0 is a big surprise.)</li>
+</ul>
+<div class="tw"><table>
+<tr><th>Truth</th><th>Model says p(class 1) =</th><th>Cost</th><th>Feeling</th></tr>
+<tr><td>1</td><td class="num">0.90</td><td class="num">0.105</td><td>Right and confident: tiny cost</td></tr>
+<tr><td>1</td><td class="num">0.50</td><td class="num">0.693</td><td>Unsure: medium cost</td></tr>
+<tr><td>1</td><td class="num">0.10</td><td class="num">2.30</td><td>Confidently wrong: big cost</td></tr>
+<tr><td>1</td><td class="num">0.01</td><td class="num">4.61</td><td>Extremely confidently wrong: huge cost</td></tr>
+</table></div>
+<p>The total cost J is simply the <strong>average of these costs over all the training samples</strong>. It is 0 for a perfect, fully confident model and grows as the model gets more wrong.</p></div>
+<div class="demo" data-title="Log-loss: how surprised is the model?" id="demo-ll">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Notice the curve shoots up as the model becomes confidently wrong. Log-loss punishes overconfidence, which encourages honest probabilities.</p>
+
+<h3>The update rule is one you already know</h3>
+<p>Here is the pleasant surprise. The gradient-descent update for logistic regression looks <em>exactly like</em> the one for linear regression, except the prediction is now the probability p:</p>
+<div class="callout math">
+<ul>
+<li>error = p − y (the probability minus the true 0/1 label)</li>
+<li>new θ₀ = old θ₀ − α × <em>(average of the errors)</em></li>
+<li>new θ₁ = old θ₁ − α × <em>(average of error × x)</em></li>
+</ul>
+<p><em>One step by hand.</em> Study hours x = 1, 2, 3, 4, 5, 6 and outcomes y = 0, 0, 1, 0, 1, 1. Start with θ₀ = 0, θ₁ = 0, so every score is 0 and every probability is 0.5. Take α = 0.5.
+<br>errors p − y = 0.5, 0.5, −0.5, 0.5, −0.5, −0.5.
+<br>average error = (0.5+0.5−0.5+0.5−0.5−0.5) ÷ 6 = <strong>0</strong>.
+<br>average of error × x = (0.5 + 1.0 − 1.5 + 2.0 − 2.5 − 3.0) ÷ 6 = −3.5 ÷ 6 = <strong>−0.583</strong>.
+<br>θ₀ = 0 − 0.5 × 0 = <strong>0</strong>; θ₁ = 0 − 0.5 × (−0.583) = <strong>0.292</strong>.
+<br>The weight on hours becomes positive: more hours, higher chance of passing. Repeat many times and the S-curve settles.</p></div>
+<div class="demo" data-title="Watch gradient descent train the S-curve" id="demo-gd">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>5. More than one feature: the boundary becomes a line</h2>
+<p>With two features (say <em>hours studied</em> and <em>attendance</em>) the score is z = θ₀ + θ₁x₁ + θ₂x₂, and the boundary z = 0 is a <strong>straight line</strong> across the plot. Points on one side are classified as class 1, points on the other side as class 0. With three features the boundary is a flat plane, and so on. That is why logistic regression is called a <strong>linear classifier</strong>: it can only separate classes with a straight boundary.</p>
+<p>In the playground below, drag the <strong>threshold</strong> and see how the mistakes trade off, and change the regularisation <strong>C</strong> (the same idea as Ridge: smaller C = stronger penalty on big weights = a gentler, less overconfident curve).</p>
+<div class="demo" data-title="2-D classifier: boundary, threshold and mistakes" id="demo-2d">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c3)"></i>passed (1)</span><span><i style="background:var(--c2)"></i>failed (0)</span><span>shading = the model's predicted class · dashed line = the decision boundary</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<h3>Choosing the threshold: it is a business decision</h3>
+<p>0.5 is only a default. Moving the threshold trades one kind of mistake for the other:</p>
+<div class="tw"><table>
+<tr><th>Situation</th><th>Costlier mistake</th><th>Set the threshold…</th></tr>
+<tr><td>Cancer screening</td><td>Missing a real case (false negative)</td><td><b>Lower</b> (say 0.2): catch more, accept more false alarms → higher recall</td></tr>
+<tr><td>Spam filter</td><td>Hiding a real email (false positive)</td><td><b>Higher</b> (say 0.9): only flag when very sure → higher precision</td></tr>
+<tr><td>Balanced costs</td><td>Both similar</td><td>Around 0.5, or pick the value that maximises F1 on validation data</td></tr>
+</table></div>
+
+<h2>6. More than two classes</h2>
+<p>For 3 or more classes (say flower species) scikit-learn extends the idea with the <strong>softmax</strong> function: compute one score per class, then turn the scores into probabilities that add up to 1, giving bigger scores a bigger share.</p>
+<div class="callout math"><p><strong>Softmax in words:</strong> probability of a class = e^(its score) ÷ (sum of e^(score) over all classes).
+<br><em>Example.</em> Scores 2.0, 1.0, 0.1 → e^score = 7.39, 2.72, 1.11 (sum 11.21) → probabilities <strong>0.66, 0.24, 0.10</strong>. The class with the highest probability wins. The two-class case is just a special case of this.</p></div>
+
+<h2>7. Logistic regression in scikit-learn</h2>
+<pre class="code">
+from sklearn.linear_model import LogisticRegression
+
+hours = [[1], [2], [3], [4], [5], [6]]     # features: 2-D
+passed = [0, 0, 1, 0, 1, 1]                 # labels
+
+model = LogisticRegression()                # C=1.0, L2 penalty by default
+model.fit(hours, passed)
+
+print(model.intercept_)                     # about [-2.68]   (theta_0)
+print(model.coef_)                          # about [[0.767]] (theta_1)
+print(model.predict_proba([[1], [3.5], [6]]))
+#  -> class-1 probabilities of about 0.13, 0.50 and 0.87
+print(model.predict([[2], [5]]))            # [0 1]   class labels (threshold 0.5)
+print(model.score(hours, passed))           # accuracy on this data
+</pre>
+<p>The decision boundary is where the score is zero: 2.68 ÷ 0.767 = 3.5 hours. (With almost no regularisation, <code>C=1e6</code>, the same data gives θ₀ ≈ −4.25 and θ₁ ≈ 1.21, a steeper curve. Regularisation makes the model less extreme.) A realistic version with scaling and evaluation:</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+model.fit(X_train, y_train)
+
+print(classification_report(y_test, model.predict(X_test)))
+
+proba = model.predict_proba(X_test)[:, 1]        # probability of class 1 for each patient
+custom = (proba >= 0.3).astype(int)              # your own threshold instead of 0.5
+</pre>
+<p>On this dataset a scaled logistic regression typically reaches an accuracy in the mid-to-high 90s (percent); the exact figure depends on the split and library version.</p>
+<div class="tw"><table>
+<tr><th>Parameter / method</th><th>What it does</th></tr>
+<tr><td><code>C</code></td><td>Inverse regularisation strength (default 1.0). <b>Smaller C = stronger penalty</b> (the opposite of Ridge's alpha!).</td></tr>
+<tr><td><code>penalty</code></td><td><code>"l2"</code> (default, Ridge-like), <code>"l1"</code> (LASSO-like, needs <code>solver="liblinear"</code> or <code>"saga"</code>), or elastic net.</td></tr>
+<tr><td><code>class_weight="balanced"</code></td><td>For imbalanced data (e.g. 1% fraud): makes mistakes on the rare class count more.</td></tr>
+<tr><td><code>max_iter</code></td><td>Optimisation steps; raise it (e.g. 1000) if you see a <code>ConvergenceWarning</code>, or scale the features.</td></tr>
+<tr><td><code>predict</code> / <code>predict_proba</code></td><td>The class (threshold 0.5) / the probabilities, one column per class.</td></tr>
+<tr><td><code>coef_</code>, <code>intercept_</code></td><td>The learned weights θ. Use <code>np.exp(coef_)</code> to get the odds multipliers.</td></tr>
+</table></div>
+
+<h2>8. Strengths, limits and pitfalls</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Fast, simple, works with little data</td><td>Only a straight boundary (add polynomial features or use SVM/trees for curves)</td></tr>
+<tr><td>Outputs probabilities, not just labels</td><td>Struggles when classes overlap heavily or interactions matter</td></tr>
+<tr><td>Weights are easy to explain (odds multipliers)</td><td>Sensitive to features on different scales unless scaled</td></tr>
+<tr><td>Good baseline and easy to regularise</td><td>Correlated features make individual weights unstable (use L2/L1)</td></tr>
+</table></div>
+<ul>
+<li><strong>Perfectly separable data.</strong> If one straight line separates the classes perfectly, the weights want to grow forever (the model wants to be infinitely confident). Regularisation (C) keeps them finite.</li>
+<li><strong>Imbalanced classes.</strong> With 1% positives, "always predict 0" is 99% accurate and useless. Use <code>class_weight</code>, a lower threshold, and precision/recall instead of accuracy.</li>
+<li><strong>Probabilities are only as good as the model.</strong> If you need well-calibrated probabilities (e.g. for pricing risk), check with a calibration curve.</li>
+</ul>
+
+<h2>9. Logistic regression in the real world</h2>
+<div class="cards">
+<div class="card"><h4>🏦 Credit scoring</h4><p>Will this borrower default? Banks have used logistic scorecards for decades because each weight can be explained to regulators and customers.</p></div>
+<div class="card"><h4>🏥 Medical diagnosis</h4><p>Risk of diabetes or heart disease from age, blood pressure, BMI. Doctors can read the odds multiplier of each factor.</p></div>
+<div class="card"><h4>📧 Spam filtering</h4><p>Probability that an email is spam from word counts, links and sender features; the threshold decides what goes to the junk folder.</p></div>
+<div class="card"><h4>📱 Customer churn</h4><p>Which subscribers are likely to cancel next month? Rank them by probability and offer a retention deal to the top group.</p></div>
+<div class="card"><h4>🖱️ Ad click prediction</h4><p>Probability that a user clicks an ad. Large ad platforms use logistic models on huge sparse feature sets.</p></div>
+<div class="card"><h4>🕵️ Fraud detection</h4><p>Probability a transaction is fraudulent; a low threshold plus human review catches more fraud.</p></div>
+<div class="card"><h4>🗳️ Marketing response</h4><p>Who will respond to this campaign? Send offers only to people above a probability cut-off.</p></div>
+<div class="card"><h4>🧱 The building block of neural nets</h4><p>A single sigmoid neuron <em>is</em> a logistic regression, and the output layer of many neural network classifiers uses the same maths (softmax).</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>Logistic regression is a <strong>classifier</strong>: score z = θ₀ + θ₁x + …, then p = σ(z) = 1 ÷ (1 + e<sup>−z</sup>), a probability between 0 and 1.</li>
+<li>Predict class 1 when p ≥ threshold (default 0.5). The <strong>decision boundary</strong> is where z = 0, a straight line/plane.</li>
+<li>Each weight multiplies the <strong>odds</strong> by e<sup>θ</sup> for every +1 in that feature.</li>
+<li>It learns by minimising <strong>log-loss</strong> ("how surprised is the model by the truth"); the update rule mirrors linear regression, using error = p − y.</li>
+<li>Use regularisation (<code>C</code>, smaller = stronger), scale your features, and tune the threshold to the cost of mistakes. Prefer precision/recall over accuracy on imbalanced data.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>A model has θ₀ = −4 and θ₁ = 1. For x = 3, compute the score z, the probability p, and the class. Where is the decision boundary?</li>
+<li>If the truth for that student is <em>pass (1)</em>, what is the log-loss cost of that prediction? (Use −ln(p).)</li>
+<li>In scikit-learn, fit <code>LogisticRegression()</code> on the pass/fail data from section 7. Print <code>predict_proba([[3.5]])</code> and confirm it is about 50/50.</li>
+<li>Bonus: on the breast-cancer example, compare the default 0.5 threshold with 0.3. What happens to recall and precision for the "malignant/benign" classes? (Use <code>classification_report</code>.)</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> z = −4 + 1×3 = −1; p = 1 ÷ (1 + e^1) = 0.269; class = 0 (below 0.5). The boundary is at x = −θ₀ ÷ θ₁ = 4.</p>
+<p><b>2.</b> cost = −ln(0.269) = 1.31 (a fairly large cost because the model gave a low probability to what actually happened).</p>
+<p><b>3.</b> About [[0.5, 0.5]], since 3.5 hours is exactly the decision boundary of that model.</p>
+<p><b>4.</b> Lowering the threshold makes the model flag more cases as class 1, so recall of that class goes up while precision usually goes down.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/logistic-regression.js"></script>
+</body>
+</html>

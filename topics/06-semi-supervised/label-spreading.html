@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Spreading · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="lspread">
+<article id="lesson">
+
+<h1>Label Spreading</h1>
+<p class="lede">Label Propagation treats every labelled point as sacred: its label can never change, even if it is wrong. Label Spreading relaxes this. Labelled points keep <em>most</em> of their label but are allowed to be influenced by their neighbours, so the method tolerates noise in the labels and is often a little more accurate. One extra number, α, controls the balance.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 65 min</span><span class="chip plain">3 interactive demos</span></div>
+
+<h2>1. The big idea: labelled points that can be persuaded</h2>
+<div class="callout analogy"><p><strong>Stubborn taps versus open-minded people.</strong> In the last lesson, labelled points were <em>taps</em> pouring dye at a fixed rate, forever, whatever happened around them. Now picture instead a room of people, some of whom were told an answer ("you are a red person"). Each round, everyone does two things: they <em>keep a share of what they were originally told</em> (weight 1 − α), and they <em>take in the average opinion of their neighbours</em> (weight α). A person told "red" who is surrounded by "blue" friends will drift towards blue over the rounds. If α is small, people mostly stick to their original information; if α is large, they follow the crowd.</p></div>
+<div class="tw"><table>
+<tr><th></th><th>Label Propagation</th><th>Label Spreading</th></tr>
+<tr><td>Labelled points</td><td>reset to their original label every round ("hard clamp")</td><td>keep a fraction 1 − α of their original label ("soft clamp") and can change</td></tr>
+<tr><td>Graph matrix</td><td>row-normalised: each row adds up to 1</td><td>symmetric normalisation S = D<sup>−½</sup> W D<sup>−½</sup></td></tr>
+<tr><td>Update</td><td>Y ← T Y, then reset labelled points</td><td>F ← α S F + (1 − α) Y<sub>0</sub></td></tr>
+<tr><td>A wrong label</td><td>is kept and spreads its mistake</td><td>can be overruled by the neighbours</td></tr>
+<tr><td>Extra setting</td><td>none</td><td><b>α</b> (alpha), 0 &lt; α &lt; 1 (scikit-learn default 0.2)</td></tr>
+<tr><td>scikit-learn default <code>max_iter</code></td><td>1000</td><td><b>30</b> (often too few: raise it)</td></tr>
+</table></div>
+
+<h2>2. The algorithm</h2>
+<ol>
+<li><strong>Build the similarity graph</strong> exactly as before: weights W between points (RBF kernel e<sup>−γ d²</sup> or k nearest neighbours). Let d<sub>i</sub> be the total weight of point i (its <em>degree</em>).</li>
+<li><strong>Normalise symmetrically:</strong> S<sub>ij</sub> = W<sub>ij</sub> ÷ √(d<sub>i</sub> × d<sub>j</sub>). In words: the influence between two points is reduced when either of them is very "popular" (has many strong links), so hubs don't dominate.</li>
+<li><strong>Start</strong> with F = Y<sub>0</sub>, where Y<sub>0</sub> holds 1 at the given class of each labelled point and zeros for everything else.</li>
+<li><strong>Repeat:</strong> new F = α × (S × F) + (1 − α) × Y<sub>0</sub>. Every point's new label distribution is <b>α × (the weighted average of its neighbours' distributions) plus (1 − α) × its original label information</b>.</li>
+<li><strong>Predict:</strong> the class with the largest value in a point's row of F.</li>
+</ol>
+<p>Because of the (1 − α) × Y<sub>0</sub> term the original labels are <em>re-injected every round</em> but never forced. And the repetition always converges to one answer, which can also be written in one step as F* = (1 − α) × (I − α S)<sup>−1</sup> × Y<sub>0</sub>.</p>
+<div class="callout tip"><p><strong>For the curious: what is it optimising?</strong> The result is the labelling that best balances two wishes: <em>smoothness</em> (points joined by a strong link should get similar values) and <em>fit</em> (points should stay close to the labels they were given). α sets the exchange rate between the two: a larger α means more weight on smoothness. Label Propagation is the extreme case in which the fit to the given labels is absolute.</p></div>
+
+<h3>By hand: the same four-point chain</h3>
+<p>The chain from the last lesson: <b>A — (2) — P — (1) — Q — (1) — B</b>, with A labelled class A and B labelled class B. The total weights (degrees) are: A 2, P 3, Q 2, B 1. So:</p>
+<div class="callout math">
+<p><strong>S values.</strong> S(A,P) = 2 ÷ √(2 × 3) = <b>0.8165</b>; S(P,Q) = 1 ÷ √(3 × 2) = <b>0.4082</b>; S(Q,B) = 1 ÷ √(2 × 1) = <b>0.7071</b>. All other entries are 0.</p>
+<p><strong>Iterating with α = 0.5.</strong> Each node has two numbers, its class-A value and its class-B value. Start: A = (1, 0), B = (0, 1), P = Q = (0, 0). Take P after one iteration: 0.5 × (0.8165 × A's value + 0.4082 × Q's value) + 0.5 × P's original (0, 0) = 0.5 × (0.8165 × 1 + 0) = <b>0.4082</b> for class A. The first three iterations (class A value, class B value):</p>
+<div class="tw"><table>
+<tr><th>Iteration</th><th class="num">A</th><th class="num">P</th><th class="num">Q</th><th class="num">B</th></tr>
+<tr><td>0</td><td class="num">(1, 0)</td><td class="num">(0, 0)</td><td class="num">(0, 0)</td><td class="num">(0, 1)</td></tr>
+<tr><td>1</td><td class="num">(0.500, 0)</td><td class="num">(0.408, 0)</td><td class="num">(0, 0.354)</td><td class="num">(0, 0.500)</td></tr>
+<tr><td>2</td><td class="num">(0.667, 0)</td><td class="num">(0.204, 0.072)</td><td class="num">(0.083, 0.177)</td><td class="num">(0, 0.625)</td></tr>
+<tr><td>3</td><td class="num">(0.583, 0.030)</td><td class="num">(0.289, 0.036)</td><td class="num">(0.042, 0.236)</td><td class="num">(0.030, 0.563)</td></tr>
+<tr><td>converged (F*)</td><td class="num">(0.606, 0.021)</td><td class="num">(0.260, 0.053)</td><td class="num">(0.061, 0.214)</td><td class="num">(0.021, 0.576)</td></tr>
+</table></div>
+<p><strong>Reading the result.</strong> Turn each converged pair into a share of class A: A 0.606 ÷ (0.606 + 0.021) = <b>96.6%</b>; P 0.260 ÷ 0.313 = <b>83.2%</b>; Q 0.061 ÷ 0.275 = <b>about 22%</b>; B 0.021 ÷ 0.597 = <b>3.6%</b>. Labels: <b>A, A, B, B</b>. Notice that the labelled end points are <em>not</em> at exactly 100% and 0% any more: with the soft clamp they are allowed to be a little influenced by the other side.</p>
+<p><strong>Comparison.</strong> Label Propagation gave 100%, 80%, 40%, 0% for the same chain. With α = 0.9 Label Spreading gives <b>72.8%, 65.2%, 48.0%, 34.6%</b> (the same labels A, A, B, B, but the numbers are squashed towards 50%, because at α = 0.9 the original labels count for only 10% of each update).</p></div>
+<p>Play with α and see how the numbers change (press Step to watch the first iterations, or "Run 200 steps"):</p>
+<div class="demo" data-title="The chain with a soft clamp" id="demo-chain">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>3. Robustness to wrong labels</h2>
+<p>Real labels contain mistakes. Take a chain of five equally linked points where the two ends are labelled class 0, and the middle point was labelled class 1 <b>by mistake</b>. The class-0 value each point ends up with (from scikit-learn) for several α:</p>
+<div class="tw"><table>
+<tr><th class="num">α</th><th class="num">node 1 (label 0)</th><th class="num">node 2</th><th class="num">node 3 (label 1 — mistake)</th><th class="num">node 4</th><th class="num">node 5 (label 0)</th><th>Node 3 final label</th></tr>
+<tr><td class="num">0.2</td><td class="num">0.986</td><td class="num">0.586</td><td class="num">0.028</td><td class="num">0.586</td><td class="num">0.986</td><td>1 (mistake kept)</td></tr>
+<tr><td class="num">0.5</td><td class="num">0.908</td><td class="num">0.586</td><td class="num">0.168</td><td class="num">0.586</td><td class="num">0.908</td><td>1 (kept)</td></tr>
+<tr><td class="num">0.8</td><td class="num">0.750</td><td class="num">0.586</td><td class="num">0.400</td><td class="num">0.586</td><td class="num">0.750</td><td>1 (kept)</td></tr>
+<tr><td class="num">0.95</td><td class="num">0.632</td><td class="num">0.586</td><td class="num"><b>0.538</b></td><td class="num">0.586</td><td class="num">0.632</td><td><b>0 (corrected!)</b></td></tr>
+<tr><td class="num">0.99</td><td class="num">0.595</td><td class="num">0.586</td><td class="num">0.576</td><td class="num">0.586</td><td class="num">0.595</td><td><b>0 (corrected)</b></td></tr>
+</table></div>
+<p>With Label Propagation the middle label is fixed and stays wrong. With Label Spreading the two correct neighbours pull on it, and if α is large enough (here above about 0.9) they win. Note that the price of a large α is that the given labels are trusted less and less: at α = 0.99 the values are all close to 0.6, barely distinguishing the points.</p>
+<p>The next picture tries this on the two moons with 6 labelled points per class, some deliberately wrong (red ✕). Left: hard clamp. Right: soft clamp. Press "New labelled points" several times and vary α.</p>
+<div class="demo" data-title="Hard clamp vs soft clamp with wrong labels" id="demo-noise">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>How large should α be? Averaged over 5 random datasets (with 6 labelled points per class). Try 0 wrong labels first, then 3: with clean labels the soft clamp gains nothing, and with wrong labels a large α (around 0.95) helps clearly in this setup, while the default 0.2 does not.</p>
+<div class="demo" data-title="Accuracy as a function of α" id="demo-alpha">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+
+<h2>4. Label Spreading in scikit-learn</h2>
+<p>scikit-learn's <code>LabelSpreading</code> has the same interface as <code>LabelPropagation</code> plus <code>alpha</code>. To check that it does what we computed by hand, we can even hand it our chain through a custom kernel (a function that returns our weight matrix):</p>
+<pre class="code">
+import numpy as np
+from sklearn.semi_supervised import LabelSpreading
+
+W = np.array([[0, 2, 0, 0], [2, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0]], float)     # A -2- P -1- Q -1- B
+idx = np.arange(4).reshape(-1, 1).astype(float)                                    # the "data" is just node numbers
+def kernel(a, b):                                                                  # returns the weight between nodes
+    return W[np.ix_(a.ravel().astype(int), b.ravel().astype(int))]
+
+for alpha in (0.5, 0.9):
+    m = LabelSpreading(kernel=kernel, alpha=alpha, max_iter=5000, tol=1e-9).fit(idx, [0, -1, -1, 1])
+    print(alpha, m.label_distributions_[:, 0].round(3), m.transduction_)
+# 0.5 [0.966 0.832 0.22  0.036] [0 0 1 1]    -> the shares of class A we found by hand (96.6%, 83.2%, about 22%, 3.6%)
+# 0.9 [0.728 0.652 0.48  0.346] [0 0 1 1]
+</pre>
+<p>Now the real comparison on the handwritten-digits images, with only <b>50 labelled images</b> (5 per digit) out of 1797, where I also <em>flipped</em> a share of those 50 labels to a wrong digit. Accuracy on the unlabelled images, averaged over 8 random choices of the labelled images (scikit-learn 1.9.0, kNN graph with 7 neighbours; other versions and seeds will differ a little):</p>
+<pre class="code">
+from sklearn.datasets import load_digits
+from sklearn.semi_supervised import LabelPropagation, LabelSpreading
+
+X, y = load_digits(return_X_y=True); X = X / 16.0
+# y_partial: 5 labelled images per digit, everything else -1 (some labels flipped to wrong digits in the noisy runs)
+
+lp = LabelPropagation(kernel="knn", n_neighbors=7, max_iter=3000).fit(X, y_partial)
+ls = LabelSpreading(kernel="knn", n_neighbors=7, alpha=0.95, max_iter=3000).fit(X, y_partial)   # raise max_iter: the default is only 30!
+
+# wrong labels    Propagation   Spreading α=0.2   α=0.5    α=0.8    α=0.95
+#   0%               0.918        0.921            0.930    0.935    0.938
+#  10% (5 of 50)     0.851        0.838            0.851    0.860    0.871
+#  20% (10 of 50)    0.732        0.732            0.746    0.758    0.776
+#  30% (15 of 50)    0.662        0.659            0.671    0.686    0.712
+</pre>
+<p>Reading the table honestly: <strong>(1)</strong> even with perfectly clean labels, Label Spreading with a large α was a little better (93.8% versus 91.8%). <strong>(2)</strong> With wrong labels, accuracy falls for both methods, and α around 0.95 gave the best result, about <b>2 to 5 points</b> above Label Propagation. <strong>(3)</strong> The default α = 0.2 was <em>no better</em> than Label Propagation on noisy labels. <strong>(4)</strong> The soft clamp rarely fixed the wrong labelled points themselves: of the flipped labels, 0% were corrected at α ≤ 0.8 and only 2% to 5% at α = 0.95. Its gain came mostly from limiting how far the mistakes spread. So do not expect miracles: clean labels remain the best remedy.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>alpha</code></td><td>The clamping factor, between 0 and 1 (exclusive) (default 0.2). Small: labels stay close to the given ones and spread little. Large: neighbours dominate, and the given labels can be overruled.</td></tr>
+<tr><td><code>kernel</code>, <code>gamma</code>, <code>n_neighbors</code></td><td>The graph, as in Label Propagation (RBF with γ = 20 by default, or kNN with 7 neighbours). Tune them, and scale your features.</td></tr>
+<tr><td><code>max_iter</code>, <code>tol</code></td><td>Iterations (default only <b>30</b>) and convergence tolerance. With large α the process needs many more iterations: about log(0.0001) ÷ log(α), so roughly 180 for α = 0.95: raise <code>max_iter</code> and watch for the "not converged" warning.</td></tr>
+<tr><td><code>transduction_</code>, <code>label_distributions_</code>, <code>classes_</code>, <code>n_iter_</code></td><td>Predicted labels of all training points, final class distributions, class names, iterations used.</td></tr>
+<tr><td><code>predict</code>, <code>predict_proba</code></td><td>For new points.</td></tr>
+</table></div>
+
+<h2>5. Choosing between the two</h2>
+<div class="tw"><table>
+<tr><th>Situation</th><th>Choose</th></tr>
+<tr><td>Your labels are perfectly reliable (a curated gold standard)</td><td>Label Propagation (or Label Spreading with a small α); the labels are the truth and should be kept.</td></tr>
+<tr><td>Labels may be noisy (crowd-sourcing, automatic labels, human disagreement)</td><td>Label Spreading with a fairly large α (try 0.8 to 0.95), checking the result.</td></tr>
+<tr><td>You want an extra tuning knob and can afford to validate it</td><td>Label Spreading: treat α like any hyper-parameter, and choose it by validating on a few extra labelled examples that you kept aside.</td></tr>
+<tr><td>Very few labels and clearly separated classes</td><td>Either works; the graph (γ or k) matters far more than the choice between them.</td></tr>
+</table></div>
+<p>Both share the same limits: they need the cluster or manifold assumption to hold; the graph settings and feature scaling are decisive; a dense RBF graph is expensive on big data. And if you have <em>enough</em> labels, ordinary supervised learning will usually do as well or better, so semi-supervised methods pay off when labels are scarce.</p>
+<div class="cards">
+<div class="card"><h4>🏷️ Crowd-labelled data</h4><p>When labels come from many part-time annotators, some are wrong; a soft clamp softens the damage.</p></div>
+<div class="card"><h4>🤖 Automatic pseudo-labels</h4><p>Labels produced by another model or by rules are imperfect by nature; treating them as suggestions rather than facts fits.</p></div>
+<div class="card"><h4>🩻 Medical images</h4><p>A few expert-labelled scans plus a large unlabelled archive; experts disagree at times, so labels are not gospel.</p></div>
+<div class="card"><h4>📄 Text categorisation</h4><p>Categorise a large corpus from a small set of tagged documents; user tags can be inconsistent.</p></div>
+<div class="card"><h4>🧬 Biological networks</h4><p>Predict protein or gene function through interaction networks, where annotations are incomplete and sometimes contradictory.</p></div>
+<div class="card"><h4>🕸️ Graph data</h4><p>Any problem that already has a graph (social, citation, road, molecule) can use spreading directly, without a kernel.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li><strong>Label Spreading</strong> = Label Propagation with a <strong>soft clamp</strong>: F ← α S F + (1 − α) Y<sub>0</sub>, where S = D<sup>−½</sup> W D<sup>−½</sup>. Each point mixes its neighbours' opinion (weight α) with its original label (weight 1 − α).</li>
+<li>Labelled points <b>can change</b>: in our chain, at α = 0.5 the labelled ends are 96.6% and 3.6% class A instead of exactly 100% and 0%; the unlabelled points end up at 83.2% and about 22%.</li>
+<li><strong>α</strong> is the trust dial: small keeps the given labels, large follows the neighbours. In the noisy five-node chain, the mistaken label was overruled only for α above about 0.9.</li>
+<li>On digits with 50 labels, Label Spreading (α ≈ 0.95) beat Label Propagation by about 2 points with clean labels and 2 to 5 points with 10 to 30% wrong labels, but it rarely corrected the wrong labelled points themselves. The default α = 0.2 gave no advantage.</li>
+<li>Raise <code>max_iter</code> (the default is 30), tune the graph and α, scale the features, and validate on a few extra labels.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>In the lesson's chain with α = 0.5, S(A,P) = 0.8165. Verify that P's class-A value after the first iteration is 0.408.</li>
+<li>What does α = 0 do to the algorithm? And what happens as α approaches 1?</li>
+<li>Which method can change the final label of a labelled point: Label Propagation or Label Spreading?</li>
+<li>On digits with 20% wrong labels, what was the best result in the table, and how much better is it than Label Propagation?</li>
+<li>Bonus: run the digits code with the default <code>max_iter=30</code> and again with <code>max_iter=3000</code> (alpha=0.95). Do the accuracies differ?</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> New P = α × (S(P,A) × A's value + S(P,Q) × Q's value) + (1 − α) × P's original = 0.5 × (0.8165 × 1 + 0.4082 × 0) + 0.5 × 0 = 0.5 × 0.8165 = <b>0.408</b>.</p>
+<p><b>2.</b> α = 0: F = Y<sub>0</sub> forever: the labelled points keep their labels, nothing spreads, and all unlabelled points stay at zero. As α → 1: the original labels are re-injected with weight (1 − α) → 0, so they seed the iteration but the neighbours take over: the labelled points can be overruled by their surroundings, all values flatten towards the same mixture, and it takes many iterations to converge.</p>
+<p><b>3.</b> <b>Label Spreading</b>: Label Propagation resets the labelled points every round, so they never change.</p>
+<p><b>4.</b> α = 0.95: <b>77.6%</b> versus 73.2% for Label Propagation: about <b>4.4 points</b> better.</p>
+<p><b>5.</b> Expect a difference: with only 30 iterations and α = 0.95 the process has not converged (it needs roughly 180 iterations), so the result is less reliable. I did not run this exact comparison, so check it yourself.</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/label-spreading.js"></script>
+</body>
+</html>

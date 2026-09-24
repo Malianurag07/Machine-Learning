@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Forest · ML, Visually</title>
+<link rel="stylesheet" href="../../css/style.css">
+</head>
+<body data-root="../../" data-topic="rf">
+<article id="lesson">
+
+<h1>Random Forest</h1>
+<p class="lede">One decision tree is easily fooled by the quirks of its training data. A random forest grows <em>hundreds of different trees</em>, each on a slightly different view of the data, and lets them vote. The crowd is far more reliable than any single member.</p>
+<div class="meta"><span class="chip">Intermediate</span><span class="chip plain">≈ 90 min</span><span class="chip plain">4 interactive demos</span></div>
+
+<h2>1. The big idea: many different trees, one vote</h2>
+<p>In the Decision Tree lesson you saw the weakness of a single tree: grown deep, it memorises the training data. Change a few training rows and you can get a completely different tree. Statisticians call this <strong>high variance</strong>: the model's answer swings wildly with the sample it was shown. But notice something useful: a deep tree is <em>not biased</em>; it is just unstable. And unstable-but-unbiased is the perfect ingredient for <strong>averaging</strong>.</p>
+<div class="callout analogy"><p><strong>Ask a jury, not one judge.</strong> Imagine you must guess how many sweets are in a huge jar. Any one person's guess is poor: some guess too high, some too low. But take the <em>average of 200 people's guesses</em> and it is often startlingly close, because the individual errors point in random directions and cancel out. A random forest is that crowd: every tree is a slightly-wrong, slightly-different opinion, and the vote (or average) cancels the individual mistakes. The trick is that the crowd only works if the people did not <em>all copy each other</em>, so the forest works hard to make every tree see the world a little differently.</p></div>
+<p>A random forest is a recipe with exactly three ingredients:</p>
+<div class="tw"><table>
+<tr><th>#</th><th>Ingredient</th><th>What it does</th></tr>
+<tr><td>1</td><td><strong>Bootstrap</strong> the rows</td><td>Every tree trains on its own random re-sample of the training rows (drawn <em>with replacement</em>), so no two trees see the same data.</td></tr>
+<tr><td>2</td><td><strong>Random features</strong> at each split</td><td>At every split a tree may only look at a random handful of the features, which forces different trees to use different questions.</td></tr>
+<tr><td>3</td><td><strong>Vote / average</strong></td><td>Classification: the majority vote (or average of probabilities). Regression: the average of the predictions.</td></tr>
+</table></div>
+<p>Ingredients 1 and 2 together are called <strong>bagging plus feature randomness</strong> ("bagging" is short for <em>b</em>ootstrap <em>agg</em>regat<em>ing</em>). Each ingredient is explained next, with numbers.</p>
+
+<h2>2. Ingredient 1: the bootstrap (sampling with replacement)</h2>
+<p>Take a training set of <strong>n</strong> rows. A <strong>bootstrap sample</strong> is made by picking a row at random, writing it down, <em>putting it back</em>, and repeating n times. Because rows go back into the bag, the same row can be picked several times and others never get picked.</p>
+<h3>By hand: 8 rows</h3>
+<p>Rows are numbered 1 to 8. One possible bootstrap sample (8 draws): <strong>1, 2, 4, 4, 6, 7, 7, 8</strong>.</p>
+<div class="callout math">
+<p>Row 4 was picked twice, row 7 twice, rows 1, 2, 6 and 8 once each. Rows <strong>3 and 5 were never picked</strong>. So this tree trains on 8 draws containing 6 distinct rows (75%), and rows 3 and 5 are its <strong>out-of-bag (OOB)</strong> rows: data this tree has never seen.</p>
+<p><strong>How many distinct rows should we expect?</strong> Each single draw misses a particular row with probability (1 − 1/n). All n draws miss it with probability (1 − 1/n)<sup>n</sup>. So a given row is <em>in</em> the sample with probability 1 − (1 − 1/n)<sup>n</sup>:</p>
+<div class="tw"><table>
+<tr><th class="num">n (rows)</th><th class="num">chance a row is in the sample</th><th class="num">chance it is out-of-bag</th></tr>
+<tr><td class="num">8</td><td class="num">65.6%</td><td class="num">34.4%</td></tr>
+<tr><td class="num">10</td><td class="num">65.1%</td><td class="num">34.9%</td></tr>
+<tr><td class="num">100</td><td class="num">63.4%</td><td class="num">36.6%</td></tr>
+<tr><td class="num">1000</td><td class="num">63.2%</td><td class="num">36.8%</td></tr>
+<tr><td class="num">very large</td><td class="num">1 − 1/e ≈ <b>63.2%</b></td><td class="num">1/e ≈ <b>36.8%</b></td></tr>
+</table></div>
+<p><strong>Rule of thumb:</strong> each tree sees about <strong>two-thirds</strong> of the distinct rows, and about <strong>one-third</strong> of the rows are left out of that tree.</p></div>
+<div class="demo" data-title="Draw your own bootstrap samples" id="demo-boot">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Press "Draw 200 samples": the orange dots cluster around the curve, and the average settles near the theory value.</p>
+<div class="callout tip"><p><strong>A free test set: the out-of-bag (OOB) score.</strong> Because every tree has about a third of the rows it never saw, we can test each row using <em>only the trees that did not train on it</em>, and average the results. That gives an honest accuracy estimate <strong>without a separate validation set and without cross-validation</strong>. In scikit-learn it is one flag: <code>oob_score=True</code>.</p></div>
+
+<h2>3. Ingredient 2: random features at every split</h2>
+<p>Bootstrap alone is not enough. Suppose one feature is very strong (say "worst perimeter" for tumours). Every tree, whatever rows it got, would put that feature at the top, and the trees would end up nearly identical. Averaging near-identical trees achieves nothing.</p>
+<p>So at <strong>every split</strong>, a tree is only allowed to consider a random subset of <code>max_features</code> features, and picks the best split among those only. Sometimes the strong feature is not in the subset, and the tree is forced to find another good question. That makes the trees <strong>different</strong>, and the "different" trees make different mistakes.</p>
+<div class="tw"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td><code>max_features="sqrt"</code></td><td>Consider √(number of features) at each split. <strong>The default for classification.</strong> With 30 features: 5.</td></tr>
+<tr><td><code>max_features=1.0</code></td><td>Consider all features (the default for the regressor). Then only the bootstrap makes trees different.</td></tr>
+<tr><td>small number (e.g. 1)</td><td>Very different trees, but each is individually weaker. More randomness = less correlation, but a bit more bias.</td></tr>
+</table></div>
+
+<h2>4. Ingredient 3: why voting works (with numbers)</h2>
+<h3>Voting by hand</h3>
+<p>Suppose each tree, independently, is right 70% of the time, and we ask an odd number of trees to vote (so no ties).</p>
+<div class="callout math">
+<p><strong>3 trees</strong>: the majority is right if at least 2 are right. Three right: 0.7³ = 0.343. Exactly two right (there are 3 ways): 3 × 0.7² × 0.3 = 0.441. Total = <strong>0.784</strong>, already above 0.70.</p>
+<div class="tw"><table>
+<tr><th class="num">Trees voting</th><th class="num">1</th><th class="num">3</th><th class="num">5</th><th class="num">11</th><th class="num">101</th></tr>
+<tr><td>Accuracy of the majority</td><td class="num">70.0%</td><td class="num">78.4%</td><td class="num">83.7%</td><td class="num">92.2%</td><td class="num">≈ 100%</td></tr>
+</table></div>
+<p><strong>The catch: independence.</strong> These numbers assume the trees make <em>independent</em> mistakes. Real trees trained on the same data are partly correlated (they tend to be wrong about the same hard rows). In words, the variance of an average of n predictions is:</p>
+<p style="text-align:center"><b>variance of the average = ρ × σ² + (1 − ρ) × σ² ÷ n</b></p>
+<p>where σ² is the variance of one tree and ρ (rho, from 0 to 1) is how correlated the trees are. Take σ² = 1:</p>
+<div class="tw"><table>
+<tr><th>Correlation ρ</th><th class="num">n = 1 tree</th><th class="num">n = 10 trees</th><th class="num">n = 100 trees</th></tr>
+<tr><td>0 (fully independent)</td><td class="num">1</td><td class="num">0.10</td><td class="num">0.01</td></tr>
+<tr><td>0.3</td><td class="num">1</td><td class="num">0.37</td><td class="num">0.307</td></tr>
+<tr><td>0.7</td><td class="num">1</td><td class="num">0.73</td><td class="num">0.703</td></tr>
+<tr><td>1 (identical trees)</td><td class="num">1</td><td class="num">1</td><td class="num">1</td></tr>
+</table></div>
+<p>Two lessons: <strong>(a)</strong> more trees always helps, but with diminishing returns: the second term shrinks towards zero and you are left with ρ × σ². <strong>(b)</strong> The only way to push below that floor is to lower ρ, that is, to make the trees <em>less alike</em>. That is exactly the job of the bootstrap and the random feature subsets.</p></div>
+<div class="demo" data-title="The power of a vote" id="demo-vote">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Set "Copying between trees" to 0 and drag the number of trees up: accuracy climbs towards 100%. Raise the copying and the curve flattens at a ceiling well below 100%. (The copying model here is a simple illustration: with that probability every tree copies one shared answer, otherwise they vote independently.)</p>
+
+<h2>5. A complete worked example by hand</h2>
+<p>Eight students: hours studied and hours slept the night before, and whether they passed (1) or failed (0).</p>
+<div class="tw"><table>
+<tr><th>Row</th><th class="num">Study hours</th><th class="num">Sleep hours</th><th>Result</th></tr>
+<tr><td>1</td><td class="num">1</td><td class="num">6</td><td>Fail (0)</td></tr>
+<tr><td>2</td><td class="num">2</td><td class="num">8</td><td>Fail (0)</td></tr>
+<tr><td>3</td><td class="num">3</td><td class="num">5</td><td>Fail (0)</td></tr>
+<tr><td>4</td><td class="num">4</td><td class="num">7</td><td>Pass (1)</td></tr>
+<tr><td>5</td><td class="num">5</td><td class="num">4</td><td>Fail (0)</td></tr>
+<tr><td>6</td><td class="num">6</td><td class="num">6</td><td>Pass (1)</td></tr>
+<tr><td>7</td><td class="num">7</td><td class="num">8</td><td>Pass (1)</td></tr>
+<tr><td>8</td><td class="num">8</td><td class="num">5</td><td>Pass (1)</td></tr>
+</table></div>
+<p>To keep the arithmetic short we grow a forest of <strong>three one-question trees ("stumps")</strong>. (A real forest has deep trees and 100+ of them, but the mechanics are identical.) Each tree gets a bootstrap sample and a randomly chosen feature; it picks the threshold with the lowest weighted Gini (see the Decision Tree lesson).</p>
+<div class="callout math">
+<p><strong>Tree 1</strong> · sample: rows 1, 2, 4, 4, 6, 7, 7, 8 · feature allowed: <b>study hours</b>. The sample's labels are 0, 0, 1, 1, 1, 1, 1, 1: six Pass, two Fail, so Gini = 1 − 0.75² − 0.25² = 0.375. Best threshold: study ≤ 3 → left {0, 0} (Gini 0), right {1,1,1,1,1,1} (Gini 0), weighted Gini = <b>0</b>. <em>Rule: study ≤ 3 → Fail, else Pass.</em> Out-of-bag rows: 3 and 5.</p>
+<p><strong>Tree 2</strong> · sample: rows 1, 3, 3, 5, 6, 6, 8, 8 · feature allowed: <b>sleep hours</b>. Labels 0,0,0,0,1,1,1,1 → Gini 0.5. The sleep values are 6,5,5,4,6,6,5,5, so the best threshold is sleep ≤ 4.5: left {row 5: Fail} (Gini 0), right 7 rows (3 Fail, 4 Pass), Gini = 1 − (4/7)² − (3/7)² = 0.490. Weighted = (1/8) × 0 + (7/8) × 0.490 = <b>0.429</b>. <em>Rule: sleep ≤ 4.5 → Fail, else Pass.</em> (A weak tree: sleep is not very informative.) Out-of-bag rows: 2, 4 and 7.</p>
+<p><strong>Tree 3</strong> · sample: rows 2, 3, 4, 5, 5, 6, 7, 8 · feature allowed: <b>study hours</b>. Labels 0,0,1,0,0,1,1,1 → Gini 0.5. Best threshold study ≤ 5.5: left 5 rows {0,0,1,0,0}, Gini = 1 − 0.2² − 0.8² = 0.32; right {1,1,1}, Gini 0; weighted = (5/8) × 0.32 + 0 = <b>0.200</b>. <em>Rule: study ≤ 5.5 → Fail, else Pass.</em> Out-of-bag row: 1.</p></div>
+<p>Three different trees, each a little wrong in its own way. Now the vote:</p>
+<div class="tw"><table>
+<tr><th>New student</th><th>Tree 1 (study ≤ 3)</th><th>Tree 2 (sleep ≤ 4.5)</th><th>Tree 3 (study ≤ 5.5)</th><th>Vote</th></tr>
+<tr><td>Studied 5 h, slept 7 h</td><td>Pass</td><td>Pass</td><td><b>Fail</b></td><td><b>2 vs 1 → Pass</b> (probability 2/3 = 0.67)</td></tr>
+<tr><td>Studied 2.5 h, slept 4 h</td><td>Fail</td><td>Fail</td><td>Fail</td><td><b>3 vs 0 → Fail</b> (probability of Pass 0)</td></tr>
+</table></div>
+<p>Notice Tree 3 was wrong about the first student (5 hours is above tree 1's cut but below tree 3's), yet the crowd outvoted it. This is exactly the variance reduction from section 4.</p>
+<h3>The out-of-bag score, by hand</h3>
+<p>Each row is judged only by the trees that never saw it:</p>
+<div class="tw"><table>
+<tr><th>Row</th><th>True</th><th>Trees that did not train on it</th><th>Their vote</th><th>Right?</th></tr>
+<tr><td>1 (1, 6)</td><td>Fail</td><td>Tree 3</td><td>study 1 ≤ 5.5 → Fail</td><td>✔</td></tr>
+<tr><td>2 (2, 8)</td><td>Fail</td><td>Tree 2</td><td>sleep 8 &gt; 4.5 → Pass</td><td>✘</td></tr>
+<tr><td>3 (3, 5)</td><td>Fail</td><td>Tree 1</td><td>study 3 ≤ 3 → Fail</td><td>✔</td></tr>
+<tr><td>4 (4, 7)</td><td>Pass</td><td>Tree 2</td><td>sleep 7 &gt; 4.5 → Pass</td><td>✔</td></tr>
+<tr><td>5 (5, 4)</td><td>Fail</td><td>Tree 1</td><td>study 5 &gt; 3 → Pass</td><td>✘</td></tr>
+<tr><td>6 and 8</td><td colspan="4">in the sample of all three trees, so no OOB prediction (with 100+ trees nearly every row gets some)</td></tr>
+<tr><td>7 (7, 8)</td><td>Pass</td><td>Tree 2</td><td>sleep 8 &gt; 4.5 → Pass</td><td>✔</td></tr>
+</table></div>
+<p><strong>OOB accuracy = 4 correct of 6 rows = 67%.</strong> An honest, free estimate with no held-out data.</p>
+<h3>Feature importance</h3>
+<p>A forest can also tell you which features mattered: add up how much impurity each feature's splits removed. Here study hours removed 0.375 (Tree 1) + 0.300 (Tree 3, from 0.5 to 0.2) = <b>0.675</b>; sleep removed 0.5 − 0.429 = <b>0.071</b>. Study hours clearly matters far more. (scikit-learn rescales each tree and averages, but the idea is exactly this.)</p>
+
+<h2>6. The forest on curved data</h2>
+<p>Now the full thing on two half-moon-shaped classes, with deep trees. The right-hand chart is the payoff: as trees are added, the test accuracy (orange line) climbs and <em>settles down</em>, while the training accuracy stays high. The dashed line is the OOB accuracy, computed without using any test points.</p>
+<div class="demo" data-title="Grow a forest" id="demo-forest">
+  <div class="db" data-canvas></div>
+  <div class="legend"><span><i style="background:var(--c1)"></i>class A</span><span><i style="background:var(--c2)"></i>class B</span><span>filled = training · hollow = test · shading = the forest's average vote · lines: blue = training accuracy, orange = test accuracy, green dashed = out-of-bag accuracy</span></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<ul>
+<li><strong>Switch to "tree #1 alone":</strong> jagged islands wrapped around individual points. Now switch back to the forest: the same kind of trees, averaged, give a much smoother boundary.</li>
+<li><strong>Drag the number of trees from 1 to 100:</strong> accuracy rises quickly at first, then flattens. <em>Adding trees never makes a random forest overfit more</em>; it only stops helping. (Depth, not the number of trees, is what controls overfitting.)</li>
+<li><strong>Turn bootstrap off and set max_features to "2 of 2":</strong> every tree is now identical. The forest collapses into one tree. This is the correlation problem from section 4, made visible.</li>
+<li><strong>Lower the depth to 1 or 2:</strong> the trees are too simple and the forest inherits that (underfitting). Forests love deep, unpruned trees, because averaging removes the overfitting.</li>
+</ul>
+
+<h2>7. Regression: averaging away the staircase</h2>
+<p>For a numeric target every tree predicts a number (the average of its leaf) and the forest predicts the <strong>average of the trees' numbers</strong>. A single regression tree gives a jagged staircase; the average of many staircases with steps in different places is a much smoother curve.</p>
+<div class="demo" data-title="Averaging many staircases" id="demo-reg">
+  <div class="db" data-canvas></div>
+  <div class="controls" data-controls></div>
+  <div class="readout" data-out></div>
+</div>
+<p>Compare "a typical single tree" with "the forest average" in the readout. The forest is nearly always noticeably better. One honest limitation to notice too: a forest can only predict values <em>inside the range it has seen</em>, because every leaf is an average of training targets. It cannot extrapolate a trend beyond the data the way a straight line can.</p>
+
+<h2>8. Random Forest in scikit-learn</h2>
+<p>Our hand example first (with 100 trees, not 3; the trees are random, so exact numbers depend on <code>random_state</code>):</p>
+<pre class="code">
+from sklearn.ensemble import RandomForestClassifier
+
+X = [[1, 6], [2, 8], [3, 5], [4, 7], [5, 4], [6, 6], [7, 8], [8, 5]]   # study, sleep
+y = [0, 0, 0, 1, 0, 1, 1, 1]
+
+rf = RandomForestClassifier(n_estimators=100, random_state=0).fit(X, y)
+
+print(rf.predict([[5, 7]]))         # [1]  -> Pass
+print(rf.predict_proba([[5, 7]]))   # [[0.2 0.8]]   -> 80% of the average leaf probability says Pass
+print(rf.predict_proba([[2.5, 4]])) # [[0.96 0.04]] -> very likely Fail
+</pre>
+<p>Now the realistic recipe on a real dataset: compare one tree with a forest, use the free OOB score, and read the feature importances. (The output comments below are from an actual run with scikit-learn 1.9.0; other versions may differ slightly.)</p>
+<pre class="code">
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+data = load_breast_cancer()
+X, y = data.data, data.target
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+
+tree = DecisionTreeClassifier(random_state=42).fit(X_train, y_train)
+print(tree.score(X_train, y_train), tree.score(X_test, y_test))   # 1.0   0.923  (memorised)
+
+rf = RandomForestClassifier(n_estimators=200, oob_score=True,
+                            random_state=42, n_jobs=-1).fit(X_train, y_train)
+print(rf.score(X_train, y_train), rf.score(X_test, y_test))       # 1.0   0.958
+print(rf.oob_score_)                                              # 0.962  (free, no test set used)
+
+# which features mattered most?
+top = sorted(zip(rf.feature_importances_, data.feature_names), reverse=True)[:3]
+print(top)   # worst perimeter (0.146), worst area (0.137), worst concave points (0.107)
+
+# cross-validated comparison on all the data
+print(cross_val_score(DecisionTreeClassifier(random_state=42), X, y, cv=5).mean())          # 0.917
+print(cross_val_score(RandomForestClassifier(n_estimators=200, random_state=42), X, y, cv=5).mean())  # 0.958
+</pre>
+<p>Both models score 100% on the training data, yet the forest is clearly better on unseen data, which is the whole point of averaging. A forest needs <strong>no feature scaling</strong> (like a tree, it only compares values to thresholds), copes with a mix of numeric and (encoded) categorical columns, and works well with default settings. Regression is the same with <code>RandomForestRegressor</code>:</p>
+<pre class="code">
+from sklearn.datasets import load_diabetes
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import r2_score
+
+Xd, yd = load_diabetes(return_X_y=True)
+Xtr, Xte, ytr, yte = train_test_split(Xd, yd, random_state=0)
+
+print(r2_score(yte, DecisionTreeRegressor(random_state=0).fit(Xtr, ytr).predict(Xte)))   # -0.18  (worse than guessing the mean!)
+print(r2_score(yte, RandomForestRegressor(n_estimators=200, random_state=0).fit(Xtr, ytr).predict(Xte)))  # 0.25
+</pre>
+<p>The diabetes data is noisy, so even the forest reaches only R² ≈ 0.25, but the jump from a negative R² (a single deep tree) to a positive one shows what averaging does.</p>
+<div class="tw"><table>
+<tr><th>Parameter / attribute</th><th>What it does</th></tr>
+<tr><td><code>n_estimators</code></td><td>Number of trees (default 100). More is never worse, only slower. Typical: 100 to 500.</td></tr>
+<tr><td><code>max_features</code></td><td>Features considered per split. Default <code>"sqrt"</code> (classifier), all features (regressor). The most important knob to tune.</td></tr>
+<tr><td><code>max_depth</code>, <code>min_samples_leaf</code></td><td>Limit tree size. Default: grow fully. Raising <code>min_samples_leaf</code> gives smoother, less noisy predictions.</td></tr>
+<tr><td><code>bootstrap</code>, <code>max_samples</code></td><td>Sample rows with replacement (default True). <code>max_samples=0.5</code> makes each tree use a smaller sample (faster, more diverse).</td></tr>
+<tr><td><code>oob_score=True</code></td><td>Computes <code>oob_score_</code>, a validation-free accuracy estimate (needs <code>bootstrap=True</code>).</td></tr>
+<tr><td><code>class_weight="balanced"</code></td><td>Give rare classes more weight.</td></tr>
+<tr><td><code>n_jobs=-1</code></td><td>Train trees in parallel on all CPU cores (trees are independent, so forests parallelise perfectly).</td></tr>
+<tr><td><code>feature_importances_</code></td><td>Impurity-based importance of each feature (sums to 1). Caution: it can favour numeric features with many distinct values; for a fairer view use <code>sklearn.inspection.permutation_importance</code> on the test set.</td></tr>
+<tr><td><code>predict_proba</code></td><td>The average of the trees' leaf probabilities.</td></tr>
+<tr><td><code>ExtraTreesClassifier</code></td><td>A close cousin: picks split thresholds at random too. Even faster, sometimes just as good.</td></tr>
+</table></div>
+
+<h2>9. Strengths, limits and real-world use</h2>
+<div class="tw"><table>
+<tr><th>Strengths</th><th>Limits</th></tr>
+<tr><td>Excellent accuracy with almost no tuning: a superb first model for tabular data</td><td>Less interpretable than one tree: you cannot draw "the" tree any more</td></tr>
+<tr><td>Resists overfitting; more trees never hurts</td><td>Big models: hundreds of deep trees use memory and are slower to predict than a linear model</td></tr>
+<tr><td>No scaling needed; handles non-linear patterns and feature interactions</td><td>Cannot extrapolate beyond the range of the training targets</td></tr>
+<tr><td>Built-in OOB score and feature importances</td><td>Weaker than linear models on very sparse, high-dimensional data such as raw text</td></tr>
+<tr><td>Robust to outliers and noisy features; trains in parallel</td><td>Boosting methods (next lessons) often edge it out when carefully tuned</td></tr>
+</table></div>
+<div class="cards">
+<div class="card"><h4>🏦 Credit scoring and fraud</h4><p>Banks combine hundreds of transaction and account features into a risk score. Forests handle the messy mix of columns with little preparation.</p></div>
+<div class="card"><h4>🏥 Medical prediction</h4><p>Predicting disease risk or readmission from lab results and history, and ranking which measurements mattered.</p></div>
+<div class="card"><h4>🛒 Customer churn and recommendation</h4><p>Which customers are about to leave? A forest on usage data is a common, dependable baseline.</p></div>
+<div class="card"><h4>🌍 Remote sensing</h4><p>Classifying land cover (forest, water, crops) from satellite bands, one of the classic large-scale uses.</p></div>
+<div class="card"><h4>🎮 Body tracking</h4><p>Kinect-style body-part recognition famously used forests of depth-comparison trees, chosen because they are very fast at prediction time.</p></div>
+<div class="card"><h4>🔎 Feature selection</h4><p>Even if the final model is something else, forest importances are a quick way to see which inputs carry signal.</p></div>
+</div>
+
+<h2>Key takeaways</h2>
+<div class="callout tip"><ul>
+<li>A random forest = <strong>many decorrelated deep trees + a vote</strong>. Deep single trees have high variance; averaging cancels it.</li>
+<li><strong>Bootstrap:</strong> each tree trains on a with-replacement sample; about <strong>63.2%</strong> of distinct rows are in, about <strong>36.8%</strong> are out-of-bag.</li>
+<li><strong>Random features per split</strong> (<code>max_features</code>, default √features for classification) keep the trees different. Variance of the average = ρσ² + (1 − ρ)σ²/n: more trees shrink the second term, less correlation lowers the first.</li>
+<li>The <strong>OOB score</strong> is a free, honest accuracy estimate; <code>feature_importances_</code> shows which features carry the signal.</li>
+<li>More trees never overfit; <strong>depth and leaf size</strong> control overfitting. No scaling needed. Great default for tabular data.</li>
+<li>Limits: less interpretable, cannot extrapolate, and bigger than one tree.</li>
+</ul></div>
+
+<div class="callout task">
+<p><strong>Mini task (20 minutes, optional).</strong></p>
+<ol>
+<li>You have 100 training rows and draw a bootstrap sample of 100. About how many rows are left out-of-bag for that tree?</li>
+<li>Nine trees vote on a patient: 5 say "sick", 4 say "healthy". What does the forest predict, and what does <code>predict_proba</code> give for "sick" if each tree's leaf is pure?</li>
+<li>A dataset has 30 features. How many does a classifier forest consider at each split by default?</li>
+<li>Three independent trees are each right 80% of the time. How often is their majority vote right?</li>
+<li>Bonus: run the breast-cancer code above. Compare <code>rf.oob_score_</code> with <code>rf.score(X_test, y_test)</code>: are they close? Then set <code>max_features=1</code> and <code>max_features=30</code> and see how the test score changes.</li>
+</ol>
+<details><summary>Show answers</summary>
+<p><b>1.</b> (1 − 1/100)<sup>100</sup> ≈ 0.366, so about <b>37 rows</b> (roughly 63 distinct rows are in the sample).</p>
+<p><b>2.</b> The majority says <b>sick</b>. With pure leaves, the probability is the vote share: 5/9 ≈ <b>0.56</b>.</p>
+<p><b>3.</b> √30 ≈ 5.5, and scikit-learn rounds down: <b>5 features</b>.</p>
+<p><b>4.</b> At least 2 right: 0.8³ + 3 × 0.8² × 0.2 = 0.512 + 0.384 = <b>0.896</b> (about 90%, up from 80%).</p>
+<p><b>5.</b> They are usually within a percent or two of each other (0.962 vs 0.958 for the run above). <code>max_features=30</code> makes the trees more alike (only the bootstrap differs), so the forest tends to help less; <code>max_features=1</code> gives very different but weaker trees. The default √30 is normally a good middle ground. (Try it: results vary slightly by run.)</p></details>
+</div>
+
+</article>
+<script src="../../js/topics.js"></script>
+<script src="../../js/lib/viz.js"></script>
+<script src="../../js/layout.js"></script>
+<script src="../../js/pages/random-forest.js"></script>
+</body>
+</html>
